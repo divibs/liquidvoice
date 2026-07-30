@@ -183,7 +183,7 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
 
     // Skip API when recording is too short or effectively silent — Whisper/gpt-4o-transcribe
     // often hallucinates filler ("Thank you.", subtitles, etc.) on quiet audio.
-    if pcm.len() < 3200 || !audio::has_audible_speech(&pcm, 16000) {
+    if pcm.len() < 1600 || !audio::has_audible_speech(&pcm, 16000) {
         if let Some(overlay) = handle.get_webview_window("overlay") {
             let _ = overlay.emit("state", "done");
             let _ = overlay.hide();

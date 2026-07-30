@@ -66,16 +66,16 @@ impl AudioRecorder {
                         .sqrt()
                         / 32768.0;
 
-                    // UI-only: track ambient (fan) floor; does not alter recorded PCM.
+                    // UI-only ambient floor (fan); does not alter recorded PCM.
                     let mut floor = noise_floor.lock().unwrap();
-                    if rms < *floor * 2.2 {
-                        *floor = *floor * 0.9 + rms * 0.1;
+                    if rms < *floor * 2.0 {
+                        *floor = *floor * 0.92 + rms * 0.08;
                     }
-                    *floor = floor.clamp(0.003, 0.08);
+                    *floor = floor.clamp(0.002, 0.06);
 
-                    // Less sensitive waveform — need clear headroom above ambient.
-                    let gated = ((rms - *floor * 3.2) / 0.4).clamp(0.0, 1.0);
-                    on_level(gated * gated);
+                    // Mild gate: quiet ambient stays flat; normal speech still moves bars.
+                    let gated = ((rms - *floor * 2.0) / 0.28).clamp(0.0, 1.0);
+                    on_level(gated);
                 },
                 |err| eprintln!("Audio stream error: {err}"),
                 None,
@@ -145,14 +145,16 @@ pub fn pcm_to_wav(pcm: &[i16], sample_rate: u32) -> Result<Vec<u8>, String> {
 
 /// True if the buffer has enough energetic frames to count as real speech.
 /// Used to skip the API on silence (avoids Whisper filler hallucinations).
+/// Thresholds stay low so normal desk distance still counts as speech.
 pub fn has_audible_speech(pcm: &[i16], sample_rate: u32) -> bool {
-    if pcm.len() < (sample_rate as usize) / 5 {
-        return false; // < ~200 ms
+    if pcm.len() < (sample_rate as usize) / 8 {
+        return false; // < ~125 ms
     }
     let frame = ((sample_rate as usize) / 50).max(64); // ~20 ms
     let mut speech_frames = 0usize;
     let mut total = 0usize;
     let mut peak = 0.0_f32;
+    let mut sum_rms = 0.0_f32;
 
     for chunk in pcm.chunks(frame) {
         total += 1;
@@ -161,12 +163,15 @@ pub fn has_audible_speech(pcm: &[i16], sample_rate: u32) -> bool {
             .sqrt()
             / 32768.0;
         peak = peak.max(rms);
-        if rms > 0.025 {
+        sum_rms += rms;
+        // Soft voice at desk distance often sits around 0.01–0.03 RMS.
+        if rms > 0.008 {
             speech_frames += 1;
         }
     }
 
-    speech_frames >= 5 && peak > 0.045 && (speech_frames as f32 / total.max(1) as f32) > 0.05
+    let mean = sum_rms / total.max(1) as f32;
+    speech_frames >= 3 && peak > 0.015 && (mean > 0.004 || speech_frames as f32 / total.max(1) as f32 > 0.03)
 }
 
 /// Filter Whisper-style silence hallucinations when the model invents filler.
