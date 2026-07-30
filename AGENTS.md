@@ -30,7 +30,6 @@ Windows system-wide STT dictation. Hold/toggle a hotkey → liquid-glass overlay
 - `npm run tauri dev` — full app, hot reload. Logs (Rust errors, audio, API) print to this terminal.
 - `npm run dev` — frontend only at `localhost:1420`; auto-plays morph with fake mic (no Tauri backend).
 - `npm run tauri build` — NSIS installer at `src-tauri/target/release/bundle/nsis/`.
-- CI: `.github/workflows/build.yml` builds the `.exe` on push to `main` (artifact `LiquidVoice-Windows`).
 
 ## Conventions / gotchas
 - **Svelte 5 reactivity:** any value derived from a `$state` MUST be `$derived`, never a top-level `const` — a plain `const` captures the initial value once and freezes (this broke the morph: geometry stuck at the dot). Inside `$effect`/rAF, read states via `untrack(() => x)`.

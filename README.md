@@ -38,7 +38,7 @@ Silent / near-silent clips are skipped so the model doesn’t hallucinate filler
 
 ## Install (end users)
 
-1. Download the latest **LiquidVoice-Windows** artifact from [GitHub Actions](https://github.com/divibs/liquidvoice/actions) (workflow **Build Windows Installer**), or build locally (below).
+1. Build the installer on a Windows PC (see **Develop** below), or use an installer someone already built with `npm run tauri build`.
 2. Run the NSIS installer (e.g. `LiquidVoice_0.1.0_x64-setup.exe`).
 3. Open **Settings** from the tray icon.
 4. Paste your **OpenAI API key** → **Save**.
@@ -135,8 +135,6 @@ npm run tauri build    # release + NSIS installer
 |----------|------|
 | NSIS installer | `src-tauri/target/release/bundle/nsis/*.exe` |
 | App binary | `src-tauri/target/release/liquidvoice.exe` |
-
-CI (`.github/workflows/build.yml`) builds the installer on every push to `main` and uploads artifact **LiquidVoice-Windows**.
 
 ---
 
