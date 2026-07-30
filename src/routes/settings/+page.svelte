@@ -1,6 +1,7 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
   import { onMount } from 'svelte';
+  import '@fontsource-variable/space-grotesk';
 
   let apiKey = $state('');
   let model = $state('gpt-4o-transcribe');
@@ -12,6 +13,7 @@
   let saved = $state(false);
 
   onMount(async () => {
+    document.documentElement.classList.add('settings-page');
     const cfg = await invoke<any>('get_config');
     apiKey = cfg.api_key;
     model = cfg.model;
@@ -41,112 +43,227 @@
 </script>
 
 <div class="settings">
-  <h1>LiquidVoice</h1>
+  <header>
+    <span class="dot"></span>
+    <h1>LiquidVoice</h1>
+    <span class="ver">v0.1</span>
+  </header>
 
-  <label>
-    OpenAI API Key
-    <input type="password" bind:value={apiKey} placeholder="sk-..." />
-  </label>
+  <section>
+    <label class="field">
+      <span class="label">OpenAI API Key</span>
+      <input type="password" bind:value={apiKey} placeholder="sk-..." />
+    </label>
 
-  <label>
-    Model
-    <select bind:value={model}>
-      <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-      <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
-    </select>
-  </label>
+    <label class="field">
+      <span class="label">Model</span>
+      <select bind:value={model}>
+        <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+        <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+      </select>
+    </label>
+  </section>
 
-  <label>
-    Hotkey
-    <input bind:value={hotkey} placeholder="Ctrl+Space" />
-  </label>
+  <section>
+    <label class="field">
+      <span class="label">Hotkey</span>
+      <input bind:value={hotkey} placeholder="Ctrl+Space" />
+    </label>
 
-  <label>
-    Trigger Mode
-    <select bind:value={triggerMode}>
-      <option value="push-to-talk">Push-to-talk (hold)</option>
-      <option value="toggle">Toggle (press start/stop)</option>
-    </select>
-  </label>
+    <div class="field">
+      <span class="label">Trigger Mode</span>
+      <div class="segmented">
+        <button
+          class:active={triggerMode === 'push-to-talk'}
+          onclick={() => (triggerMode = 'push-to-talk')}>
+          Hold to talk
+        </button>
+        <button
+          class:active={triggerMode === 'toggle'}
+          onclick={() => (triggerMode = 'toggle')}>
+          Toggle
+        </button>
+      </div>
+    </div>
+  </section>
 
-  <label>
-    Language hint (optional)
-    <input bind:value={language} placeholder="en" />
-  </label>
+  <section>
+    <label class="field">
+      <span class="label">Language hint <em>optional</em></span>
+      <input bind:value={language} placeholder="en" />
+    </label>
 
-  <label>
-    Custom prompt / vocabulary (optional)
-    <input bind:value={prompt} placeholder="Technical terms..." />
-  </label>
+    <label class="field">
+      <span class="label">Custom vocabulary <em>optional</em></span>
+      <input bind:value={prompt} placeholder="Technical terms, names..." />
+    </label>
+  </section>
 
-  <label>
-    Theme
-    <select bind:value={theme}>
-      <option value="auto">Auto (system)</option>
-      <option value="dark">Dark</option>
-      <option value="light">Light</option>
-    </select>
-  </label>
-
-  <button onclick={save}>
-    {saved ? '✓ Saved' : 'Save'}
+  <button class="save" onclick={save} class:saved>
+    {saved ? '✓ Saved' : 'Save changes'}
   </button>
 </div>
 
 <style>
   .settings {
     font-family: 'Segoe UI', system-ui, sans-serif;
-    padding: 20px;
-    max-width: 320px;
-    margin: 0 auto;
+    min-height: 100vh;
+    padding: 22px 22px 18px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    background: #1a1a1e;
-    color: #e4e4e7;
-    min-height: 100vh;
+    gap: 16px;
+    color: #d6f5f7;
+    background:
+      radial-gradient(420px 240px at 85% -10%, rgba(34, 211, 238, 0.1), transparent 65%),
+      radial-gradient(360px 220px at -10% 105%, rgba(251, 191, 36, 0.05), transparent 65%),
+      linear-gradient(165deg, #0d141a, #0a0f14 60%, #0c1218);
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    gap: 9px;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #22d3ee, #2dd4bf);
+    box-shadow: 0 0 10px rgba(45, 212, 191, 0.7);
+    align-self: center;
+    animation: pulse 2.4s ease-in-out infinite;
   }
 
   h1 {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0 0 4px;
+    font-family: 'Space Grotesk Variable', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 0;
+    color: #ecfeff;
   }
 
-  label {
+  .ver {
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: rgba(103, 232, 249, 0.45);
+  }
+
+  section {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-size: 12px;
-    color: #a1a1aa;
+    gap: 11px;
+    padding: 13px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(103, 232, 249, 0.08);
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: rgba(165, 243, 252, 0.55);
+  }
+
+  .label em {
+    font-style: normal;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    text-transform: none;
+    color: rgba(165, 243, 252, 0.3);
+    margin-left: 5px;
   }
 
   input, select {
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #3f3f46;
-    background: #27272a;
-    color: #e4e4e7;
+    padding: 7px 11px;
+    border-radius: 7px;
+    border: 1px solid rgba(103, 232, 249, 0.14);
+    background: rgba(8, 14, 18, 0.7);
+    color: #e0fcff;
     font-size: 13px;
+    font-family: inherit;
     outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
 
   input:focus, select:focus {
-    border-color: #6366f1;
+    border-color: rgba(45, 212, 191, 0.6);
+    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12);
   }
 
-  button {
-    margin-top: 8px;
-    padding: 8px;
-    border-radius: 6px;
+  input::placeholder {
+    color: rgba(165, 243, 252, 0.25);
+  }
+
+  .segmented {
+    display: flex;
+    gap: 4px;
+    padding: 3px;
+    border-radius: 8px;
+    background: rgba(8, 14, 18, 0.7);
+    border: 1px solid rgba(103, 232, 249, 0.14);
+  }
+
+  .segmented button {
+    flex: 1;
+    padding: 6px 0;
     border: none;
-    background: #6366f1;
-    color: white;
-    font-size: 13px;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(165, 243, 252, 0.5);
+    font-size: 12px;
+    font-family: inherit;
     cursor: pointer;
+    transition: all 0.15s ease;
   }
 
-  button:hover {
-    background: #4f46e5;
+  .segmented button.active {
+    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(45, 212, 191, 0.18));
+    color: #a5f3fc;
+    box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.35);
+  }
+
+  .save {
+    margin-top: auto;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #06b6d4, #14b8a6);
+    color: #04141a;
+    font-family: 'Space Grotesk Variable', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
+    box-shadow: 0 4px 18px rgba(20, 184, 166, 0.25);
+  }
+
+  .save:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 22px rgba(20, 184, 166, 0.35);
+  }
+
+  .save:active {
+    transform: translateY(0);
+  }
+
+  .save.saved {
+    background: linear-gradient(135deg, #34d399, #2dd4bf);
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 6px rgba(45, 212, 191, 0.5); }
+    50% { box-shadow: 0 0 14px rgba(45, 212, 191, 0.9); }
   }
 </style>
