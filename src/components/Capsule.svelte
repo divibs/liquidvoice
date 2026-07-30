@@ -15,15 +15,17 @@
     onCollapsed?: () => void;
   }>();
 
-  // raw = linear morph position 0..1 (one timeline, plays forward & back)
+  // morph progress 0..1
   let raw = $state(0);
-  let lvl = $state(0); // mic level, smoothed
-  let wt = $state(0); // slow waveform clock
-  let pt = $state(0); // pulse clock (status dot / idle breathe)
+  let lvl = $state(0);
+  let wt = $state(0);
   let collapsed = false;
 
-  const OPEN = 560; // ms dot -> capsule
-  const CLOSE = 440; // ms capsule -> dot
+  const OPEN = 650;
+  const CLOSE = 380;
+  const MAX_W = 168;
+  const MAX_H = 34;
+  const N = 10;
 
   $effect(() => {
     let raf = 0;
@@ -40,8 +42,7 @@
       const want = md === 'process' ? 0.05 : lv;
       lvl += (want - lvl) * Math.min(1, dt * 0.012);
 
-      wt += dt * 0.0022; // gentle traveling wave
-      pt += dt * 0.004;
+      wt += dt * 0.0035;
 
       if (tgt === 0 && raw <= 0 && !collapsed) {
         collapsed = true;
@@ -63,140 +64,201 @@
   };
   const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
 
-  // staged sub-eases over the single timeline (all reactive)
-  const sep = $derived(smooth(0.14, 0.62, raw)); // caps pull apart (the stretch)
-  const grow = $derived(smooth(0.0, 0.5, raw)); // dot swells from frame one
-  const neck = $derived(smooth(0.12, 0.96, raw)); // liquid neck fills -> true capsule at 1
+  function springKick(t: number) {
+    const u = clamp01(t / 0.32);
+    return Math.exp(-3.2 * u) * Math.cos(u * Math.PI * 2.2);
+  }
 
-  const CX = 210;
-  const capR = $derived(lerp(8, 26, grow));
-  const half = $derived(lerp(0, 170, sep));
-  const leftCx = $derived(CX - half);
-  const rightCx = $derived(CX + half);
-  const rectH = $derived(lerp(0, 52, neck)); // == 2*capR at rest => clean capsule, no peanut
-  const rectW = $derived(Math.max(0, rightCx - leftCx));
+  const appear = $derived(smooth(0, 0.14, raw));
+  const stretch = $derived(smooth(0.06, 0.48, raw));
+  const refine = $derived(smooth(0.28, 0.85, raw));
+  const settle = $derived(smooth(0.62, 1, raw));
+  const pinch = $derived(Math.sin(smooth(0.08, 0.5, raw) * Math.PI));
 
-  const co = $derived(smooth(0.34, 0.95, raw)); // inner elements bloom in as glass forms
-
-  // damped settle wobble on the last beat + a constant idle breathe
-  const sw = $derived(smooth(0.62, 1.0, raw));
-  const groupScale = $derived(
-    (1 + Math.sin(sw * Math.PI) * 0.06 * (1 - sw)) * (1 + Math.sin(pt * 1.5) * 0.012),
+  const pillW = $derived(lerp(12, MAX_W, stretch) * appear);
+  const pillH = $derived(
+    Math.max(12 * appear, lerp(12, MAX_H, refine) * appear) * (1 - pinch * 0.12),
   );
-
-  const rim = $derived(mode === 'error' ? '#fb7185' : '#c4a7ff');
-  const glowCol = $derived(mode === 'error' ? 'rgba(244,63,94,0.55)' : 'rgba(139,92,246,0.6)');
-  const glowOp = $derived(
-    clamp01((0.2 + lvl * 0.5) * co + 0.04 * Math.sin(pt * 1.3) + 0.05),
+  const uiOp = $derived(smooth(0.38, 0.72, raw));
+  const uiY = $derived(lerp(6, 0, smooth(0.4, 0.78, raw)));
+  const scale = $derived(
+    appear * (1 + springKick(raw) * 0.22 * appear + Math.sin(settle * Math.PI) * 0.045 * (1 - settle)),
   );
 
   const mm = $derived(String(Math.floor(elapsed / 60)).padStart(2, '0'));
   const ss = $derived(String(elapsed % 60).padStart(2, '0'));
 
-  // tapered spectrum: dots at the ends, tall in the middle, slow traveling motion
-  const N = 23;
-  const X0 = 82;
-  const SPAN = 186;
-  function bar(i: number) {
+  const err = $derived(mode === 'error');
+  const processing = $derived(mode === 'process');
+
+  function barH(i: number) {
     const taper = Math.sin((Math.PI * i) / (N - 1));
-    const wave = 0.55 + 0.45 * Math.sin(wt + i * 0.55);
-    const h = 2 + taper * (3 + lvl * 26) * (0.6 + 0.4 * wave);
-    return { x: X0 + (SPAN * i) / (N - 1), h };
+    const amp = 0.5 + 0.5 * Math.sin(wt + i * 0.55);
+    return Math.max(2, (2.2 + taper * (2.8 + lvl * 11) * amp) * uiOp);
   }
 </script>
 
-<svg class="capsule" viewBox="0 0 420 64" width="420" height="64">
-  <defs>
-    <linearGradient id="glass" gradientUnits="userSpaceOnUse" x1="0" y1="2" x2="0" y2="62">
-      <stop offset="0%" stop-color="rgba(150,120,210,0.34)" />
-      <stop offset="16%" stop-color="rgba(46,32,72,0.55)" />
-      <stop offset="100%" stop-color="rgba(15,11,26,0.7)" />
-    </linearGradient>
-    <radialGradient id="dotG" cx="35%" cy="30%" r="75%">
-      <stop offset="0%" stop-color="#d8b4fe" />
-      <stop offset="100%" stop-color="#7c3aed" />
-    </radialGradient>
-    <linearGradient id="barG" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#e9d5ff" />
-      <stop offset="100%" stop-color="#8b5cf6" />
-    </linearGradient>
+<div
+  class="capsule"
+  class:error={err}
+  style:--w="{pillW}px"
+  style:--h="{pillH}px"
+  style:--s={scale}
+  style:--ui={uiOp}
+  style:--uy="{uiY}px"
+>
+  <div class="glass">
+    <div class="chrome">
+      <div class="mic" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <rect x="9" y="2" width="6" height="11" rx="3" fill="currentColor" stroke="none" />
+          <path d="M5 11a7 7 0 0 0 14 0" />
+          <line x1="12" y1="18" x2="12" y2="22" />
+          <line x1="8" y1="22" x2="16" y2="22" />
+        </svg>
+      </div>
 
-    <!-- goo merge + extracted liquid rim -->
-    <filter id="glassF" x="-20%" y="-55%" width="140%" height="210%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b" />
-      <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo" />
-      <feMorphology in="goo" operator="dilate" radius="1.1" result="dil" />
-      <feComposite in="dil" in2="goo" operator="arithmetic" k1="0" k2="1" k3="-1" k4="0" result="ring" />
-      <feFlood flood-color={rim} result="rimc" />
-      <feComposite in="rimc" in2="ring" operator="in" result="rimcol" />
-      <feGaussianBlur in="rimcol" stdDeviation="0.4" result="rimsoft" />
-      <feMerge>
-        <feMergeNode in="rimsoft" />
-        <feMergeNode in="goo" />
-      </feMerge>
-    </filter>
+      <div class="wave" aria-hidden="true">
+        {#each Array(N) as _, i}
+          <i style:--bh="{barH(i)}px"></i>
+        {/each}
+      </div>
 
-    <filter id="glowF" x="-60%" y="-120%" width="220%" height="340%">
-      <feGaussianBlur stdDeviation="11" />
-    </filter>
-  </defs>
-
-  <!-- breathing underglow -->
-  <ellipse
-    cx="210"
-    cy="40"
-    rx={lerp(16, 176, raw)}
-    ry={lerp(5, 24, raw)}
-    fill={glowCol}
-    opacity={glowOp}
-    filter="url(#glowF)"
-  />
-
-  <!-- whole body settles as one liquid mass -->
-  <g transform="translate(210 32) scale({groupScale}) translate(-210 -32)">
-    <g filter="url(#glassF)">
-      <circle cx={leftCx} cy={32} r={capR} fill="url(#glass)" />
-      <rect x={leftCx} y={32 - rectH / 2} width={rectW} height={rectH} rx={rectH / 2} fill="url(#glass)" />
-      <circle cx={rightCx} cy={32} r={capR} fill="url(#glass)" />
-    </g>
-
-    <!-- contents bloom in once the glass has a shape -->
-    <g opacity={co}>
-      <circle cx={leftCx} cy={32} r={20} fill="rgba(10,7,18,0.45)" stroke={rim} stroke-opacity="0.4" stroke-width="1" />
-      <g transform="translate({leftCx - 9} 23)" stroke="#d8b4fe" fill="none" stroke-width="1.6" stroke-linecap="round">
-        <rect x="6.5" y="2" width="5" height="9" rx="2.5" fill="#d8b4fe" stroke="none" />
-        <path d="M4.5 8.5 a4.5 4.5 0 0 0 9 0" />
-        <line x1="9" y1="13" x2="9" y2="16" />
-        <line x1="6" y1="16" x2="12" y2="16" />
-      </g>
-
-      {#each Array(N) as _, i}
-        {@const b = bar(i)}
-        <rect x={b.x - 1.5} y={32 - b.h / 2} width="3" height={b.h} rx="1.5" fill="url(#barG)" />
-      {/each}
-
-      <line x1="288" y1="20" x2="288" y2="44" stroke={rim} stroke-opacity="0.3" stroke-width="1" />
-      <text
-        x="300"
-        y="37"
-        fill="rgba(233,224,255,0.92)"
-        font-family="'Space Grotesk Variable', sans-serif"
-        font-size="13"
-        letter-spacing="0.5"
-      >{mm}:{ss}</text>
-
-      <circle cx={rightCx} cy={32} r={mode === 'process' ? 6 + Math.sin(pt * 6) * 1.4 : 6} fill="url(#dotG)">
-        {#if mode === 'process'}
-          <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
-        {/if}
-      </circle>
-    </g>
-  </g>
-</svg>
+      <div class="meta">
+        <span class="timer">{mm}:{ss}</span>
+        <span class="rec" class:busy={processing}></span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <style>
   .capsule {
+    display: grid;
+    place-items: center;
+    width: 200px;
+    height: 48px;
+    transform: scale(var(--s, 1));
+    transform-origin: center center;
+    will-change: transform;
+  }
+
+  .glass {
+    width: var(--w, 12px);
+    height: var(--h, 12px);
+    border-radius: 999px;
+    border: none;
+    overflow: hidden;
+    isolation: isolate;
+    /* dark frost — works on transparent overlay; blurs stage chrome in dev */
+    background: rgba(6, 6, 12, 0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(185%) brightness(0.92);
+    backdrop-filter: blur(16px) saturate(185%) brightness(0.92);
+    box-shadow:
+      0 10px 36px rgba(0, 0, 0, 0.4),
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      inset 0 1px 1px rgba(255, 255, 255, 0.08),
+      inset 0 -10px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  .capsule.error .glass {
+    background: rgba(40, 8, 16, 0.58);
+    box-shadow:
+      0 10px 36px rgba(127, 29, 29, 0.35),
+      0 2px 8px rgba(0, 0, 0, 0.25),
+      inset 0 1px 1px rgba(255, 255, 255, 0.08),
+      inset 0 -10px 18px rgba(0, 0, 0, 0.28);
+  }
+
+  .chrome {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 5px 0 3px;
+    opacity: var(--ui, 0);
+    transform: translateY(var(--uy, 5px));
+    pointer-events: none;
+  }
+
+  .mic {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    box-shadow:
+      inset 0 1px 2px rgba(255, 255, 255, 0.1),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .mic svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .wave {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.8px;
+    height: 16px;
+    min-width: 0;
+  }
+
+  .wave i {
     display: block;
-    overflow: visible;
+    width: 2px;
+    border-radius: 99px;
+    height: var(--bh, 4px);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.35);
+  }
+
+  .meta {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-left: 5px;
+    height: 14px;
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.12);
+  }
+
+  .timer {
+    font-family: 'Space Grotesk Variable', 'Segoe UI', sans-serif;
+    font-size: 10px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .rec {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fecaca, #ef4444 45%, #dc2626);
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+    animation: pulse 1.3s ease-in-out infinite;
+  }
+
+  .rec.busy {
+    animation-duration: 0.7s;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(0.82);
+      opacity: 0.7;
+    }
   }
 </style>
