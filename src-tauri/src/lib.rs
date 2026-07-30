@@ -74,14 +74,15 @@ pub fn run() {
 
             if let Some(overlay) = app.get_webview_window("overlay") {
                 if let Ok(Some(monitor)) = overlay.primary_monitor() {
+                    let origin = monitor.position();
                     let screen_w = monitor.size().width as i32;
                     let scale = monitor.scale_factor();
                     let win_w = (460.0 * scale) as i32;
-                    // Top-center of primary monitor (was bottom-center).
+                    // Flush near the physical top edge of the primary display.
                     let _ = overlay.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition {
-                            x: (screen_w - win_w) / 2,
-                            y: (48.0 * scale) as i32,
+                            x: origin.x + (screen_w - win_w) / 2,
+                            y: origin.y + (4.0 * scale) as i32,
                         },
                     ));
                 }
@@ -180,7 +181,9 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
         let _ = overlay.emit("state", "processing");
     }
 
-    if pcm.len() < 8000 {
+    // Skip API when recording is too short or effectively silent — Whisper/gpt-4o-transcribe
+    // often hallucinates filler ("Thank you.", subtitles, etc.) on quiet audio.
+    if pcm.len() < 3200 || !audio::has_audible_speech(&pcm, 16000) {
         if let Some(overlay) = handle.get_webview_window("overlay") {
             let _ = overlay.emit("state", "done");
             let _ = overlay.hide();
@@ -220,7 +223,8 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
         match result {
             Ok(text) => {
                 let text = text.trim().to_string();
-                if !text.is_empty() {
+                // Drop empty / common silence-hallucination phrases.
+                if !text.is_empty() && !audio::is_likely_hallucination(&text) {
                     let _ = inject::type_text(&text);
                 }
                 if let Some(overlay) = h.get_webview_window("overlay") {

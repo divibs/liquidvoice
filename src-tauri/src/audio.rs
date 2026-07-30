@@ -239,3 +239,72 @@ pub fn pcm_to_wav(pcm: &[i16], sample_rate: u32) -> Result<Vec<u8>, String> {
     writer.finalize().map_err(|e| e.to_string())?;
     Ok(cursor.into_inner())
 }
+
+/// True if the buffer has enough energetic frames to count as real speech.
+pub fn has_audible_speech(pcm: &[i16], sample_rate: u32) -> bool {
+    if pcm.len() < (sample_rate as usize) / 5 {
+        return false; // < ~200 ms
+    }
+    let frame = ((sample_rate as usize) / 50).max(64); // ~20 ms
+    let mut speech_frames = 0usize;
+    let mut total = 0usize;
+    let mut peak = 0.0_f32;
+
+    for chunk in pcm.chunks(frame) {
+        total += 1;
+        let rms = (chunk.iter().map(|&s| (s as f32).powi(2)).sum::<f32>()
+            / chunk.len() as f32)
+            .sqrt()
+            / 32768.0;
+        peak = peak.max(rms);
+        // After denoise, real speech sits well above residual gate floor.
+        if rms > 0.018 {
+            speech_frames += 1;
+        }
+    }
+
+    speech_frames >= 4 && peak > 0.03 && (speech_frames as f32 / total.max(1) as f32) > 0.04
+}
+
+/// Filter Whisper-style silence hallucinations when the model invents filler.
+pub fn is_likely_hallucination(text: &str) -> bool {
+    let t = text.trim().to_lowercase();
+    if t.is_empty() {
+        return true;
+    }
+    const PHRASES: &[&str] = &[
+        "thank you",
+        "thanks for watching",
+        "thanks for listening",
+        "thank you for watching",
+        "please subscribe",
+        "字幕",
+        "字幕by",
+        "amara.org",
+        "www.youtube.com",
+        "you",
+        ".",
+        "...",
+        "bye",
+        "bye.",
+        "okay",
+        "ok",
+        "um",
+        "uh",
+        "hmm",
+        "mbc 뉴스",
+        "시청해 주셔서 감사합니다",
+    ];
+    let stripped: String = t
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    if stripped.chars().count() <= 2 {
+        return true;
+    }
+    PHRASES.iter().any(|p| stripped == *p)
+}
