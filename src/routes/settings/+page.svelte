@@ -3,14 +3,21 @@
   import { onMount } from 'svelte';
   import '@fontsource-variable/space-grotesk';
 
+  type Wallpaper = 'blueprint' | 'signal' | 'zinc';
+
   let apiKey = $state('');
   let model = $state('gpt-4o-transcribe');
   let hotkey = $state('Ctrl+Space');
   let triggerMode = $state('push-to-talk');
   let language = $state('');
   let prompt = $state('');
-  let theme = $state('auto');
+  let wallpaper = $state<Wallpaper>('blueprint');
   let saved = $state(false);
+
+  function normalizeTheme(t: string): Wallpaper {
+    if (t === 'signal' || t === 'zinc' || t === 'blueprint') return t;
+    return 'blueprint';
+  }
 
   onMount(async () => {
     document.documentElement.classList.add('settings-page');
@@ -21,7 +28,7 @@
     triggerMode = cfg.trigger_mode;
     language = cfg.language;
     prompt = cfg.prompt;
-    theme = cfg.theme;
+    wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
   });
 
   async function save() {
@@ -33,7 +40,7 @@
         trigger_mode: triggerMode,
         language,
         prompt,
-        theme,
+        theme: wallpaper,
         max_recording_sec: 60,
       },
     });
@@ -42,11 +49,9 @@
   }
 </script>
 
-<div class="shell">
-  <div class="field-bg" aria-hidden="true">
-    <span class="orb o1"></span>
-    <span class="orb o2"></span>
-    <span class="orb o3"></span>
+<div class="shell" data-wall={wallpaper}>
+  <div class="wall" aria-hidden="true">
+    <div class="wall-layer"></div>
   </div>
 
   <div class="settings">
@@ -59,71 +64,115 @@
       <span class="ver">v0.1</span>
     </header>
 
-    <section class="panel">
-      <div class="frost" aria-hidden="true"></div>
-      <div class="grain" aria-hidden="true"></div>
-      <div class="panel-body">
-        <label class="field">
-          <span class="label">OpenAI API Key</span>
-          <input type="password" bind:value={apiKey} placeholder="sk-..." />
-        </label>
+    <div class="scroll">
+      <section class="panel">
+        <div class="frost" aria-hidden="true"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="panel-body">
+          <label class="field">
+            <span class="label">OpenAI API Key</span>
+            <input type="password" bind:value={apiKey} placeholder="sk-..." />
+          </label>
 
-        <label class="field">
-          <span class="label">Model</span>
-          <select bind:value={model}>
-            <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-            <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
-          </select>
-        </label>
-      </div>
-    </section>
+          <label class="field">
+            <span class="label">Model</span>
+            <select bind:value={model}>
+              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+            </select>
+          </label>
+        </div>
+      </section>
 
-    <section class="panel">
-      <div class="frost" aria-hidden="true"></div>
-      <div class="grain" aria-hidden="true"></div>
-      <div class="panel-body">
-        <label class="field">
-          <span class="label">Hotkey</span>
-          <input bind:value={hotkey} placeholder="Ctrl+Space" />
-        </label>
+      <section class="panel">
+        <div class="frost" aria-hidden="true"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="panel-body">
+          <label class="field">
+            <span class="label">Hotkey</span>
+            <input bind:value={hotkey} placeholder="Ctrl+Space" />
+          </label>
 
-        <div class="field">
-          <span class="label">Trigger Mode</span>
-          <div class="segmented">
-            <button
-              type="button"
-              class:active={triggerMode === 'push-to-talk'}
-              onclick={() => (triggerMode = 'push-to-talk')}
-            >
-              Hold to talk
-            </button>
-            <button
-              type="button"
-              class:active={triggerMode === 'toggle'}
-              onclick={() => (triggerMode = 'toggle')}
-            >
-              Toggle
-            </button>
+          <div class="field">
+            <span class="label">Trigger Mode</span>
+            <div class="segmented">
+              <button
+                type="button"
+                class:active={triggerMode === 'push-to-talk'}
+                onclick={() => (triggerMode = 'push-to-talk')}
+              >
+                Hold to talk
+              </button>
+              <button
+                type="button"
+                class:active={triggerMode === 'toggle'}
+                onclick={() => (triggerMode = 'toggle')}
+              >
+                Toggle
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="panel">
-      <div class="frost" aria-hidden="true"></div>
-      <div class="grain" aria-hidden="true"></div>
-      <div class="panel-body">
-        <label class="field">
-          <span class="label">Language hint <em>optional</em></span>
-          <input bind:value={language} placeholder="en" />
-        </label>
+      <section class="panel">
+        <div class="frost" aria-hidden="true"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="panel-body">
+          <label class="field">
+            <span class="label">Language hint <em>optional</em></span>
+            <input bind:value={language} placeholder="en" />
+          </label>
 
-        <label class="field">
-          <span class="label">Custom vocabulary <em>optional</em></span>
-          <input bind:value={prompt} placeholder="Technical terms, names..." />
-        </label>
-      </div>
-    </section>
+          <label class="field">
+            <span class="label">Custom vocabulary <em>optional</em></span>
+            <input bind:value={prompt} placeholder="Technical terms, names..." />
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="frost" aria-hidden="true"></div>
+        <div class="grain" aria-hidden="true"></div>
+        <div class="panel-body">
+          <div class="field">
+            <span class="label">Wallpaper</span>
+            <div class="walls">
+              <button
+                type="button"
+                class="wall-pick blueprint"
+                class:active={wallpaper === 'blueprint'}
+                onclick={() => (wallpaper = 'blueprint')}
+                aria-label="Blueprint wallpaper"
+              >
+                <span class="wall-preview"></span>
+                <span class="wall-name">Blueprint</span>
+              </button>
+              <button
+                type="button"
+                class="wall-pick signal"
+                class:active={wallpaper === 'signal'}
+                onclick={() => (wallpaper = 'signal')}
+                aria-label="Signal wallpaper"
+              >
+                <span class="wall-preview"></span>
+                <span class="wall-name">Signal</span>
+              </button>
+              <button
+                type="button"
+                class="wall-pick zinc"
+                class:active={wallpaper === 'zinc'}
+                onclick={() => (wallpaper = 'zinc')}
+                aria-label="Zinc wallpaper"
+              >
+                <span class="wall-preview"></span>
+                <span class="wall-name">Zinc</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
 
     <button type="button" class="save" onclick={save} class:saved>
       {saved ? 'Saved' : 'Save changes'}
@@ -135,84 +184,144 @@
   :global(html.settings-page),
   :global(html.settings-page body) {
     margin: 0;
-    background: #07070a;
+    height: 100%;
+    background: #0a0a0b;
     overflow: hidden;
   }
 
   .shell {
     position: relative;
-    min-height: 100vh;
+    height: 100vh;
+    height: 100dvh;
     font-family: 'Space Grotesk Variable', 'Segoe UI', system-ui, sans-serif;
     color: rgba(255, 255, 255, 0.92);
+    overflow: hidden;
   }
 
-  .field-bg {
+  .wall {
     position: absolute;
     inset: 0;
+    z-index: 0;
     overflow: hidden;
-    background:
-      radial-gradient(ellipse 70% 50% at 18% 12%, #4c1d95 0%, transparent 55%),
-      radial-gradient(ellipse 55% 45% at 88% 18%, #1e3a8a 0%, transparent 50%),
-      radial-gradient(ellipse 50% 50% at 70% 95%, #9d174d 0%, transparent 50%),
-      #07070a;
-  }
-
-  .orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(36px);
     pointer-events: none;
   }
-  .o1 {
-    width: 180px;
-    height: 180px;
-    left: -40px;
-    top: 20%;
-    background: #7c3aed;
-    opacity: 0.45;
+
+  .wall-layer {
+    position: absolute;
+    inset: 0;
   }
-  .o2 {
-    width: 160px;
-    height: 160px;
-    right: -30px;
-    top: 8%;
-    background: #2563eb;
-    opacity: 0.35;
+
+  /* 1 · Blueprint — engineering grid, ink + cyan hairlines */
+  .shell[data-wall='blueprint'] .wall-layer {
+    background-color: #071018;
+    background-image:
+      linear-gradient(rgba(56, 189, 248, 0.09) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56, 189, 248, 0.09) 1px, transparent 1px),
+      linear-gradient(rgba(56, 189, 248, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
+    background-size:
+      48px 48px,
+      48px 48px,
+      8px 8px,
+      8px 8px;
+    background-position:
+      -1px -1px,
+      -1px -1px,
+      -1px -1px,
+      -1px -1px;
   }
-  .o3 {
-    width: 140px;
-    height: 140px;
-    left: 35%;
-    bottom: -20px;
-    background: #db2777;
-    opacity: 0.3;
+
+  .shell[data-wall='blueprint'] .wall-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, rgba(7, 16, 24, 0.85) 0%, transparent 18%, transparent 82%, rgba(7, 16, 24, 0.85) 100%),
+      linear-gradient(0deg, rgba(7, 16, 24, 0.9) 0%, transparent 22%, transparent 78%, rgba(7, 16, 24, 0.55) 100%);
+  }
+
+  /* 2 · Signal — CRT raster / scan, no glow blobs */
+  .shell[data-wall='signal'] .wall-layer {
+    background-color: #050805;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(34, 197, 94, 0.07) 0 1px,
+      transparent 1px 3px
+    );
+  }
+
+  .shell[data-wall='signal'] .wall-layer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      90deg,
+      transparent 0 11px,
+      rgba(0, 0, 0, 0.35) 11px 12px
+    );
+    opacity: 0.55;
+  }
+
+  .shell[data-wall='signal'] .wall-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.55) 0%,
+      transparent 18%,
+      transparent 82%,
+      rgba(0, 0, 0, 0.7) 100%
+    );
+  }
+
+  /* 3 · Zinc — hard industrial bands, metal gray */
+  .shell[data-wall='zinc'] .wall-layer {
+    background-color: #121417;
+    background-image: repeating-linear-gradient(
+      -32deg,
+      #121417 0 28px,
+      #1a1d22 28px 56px,
+      #0e1013 56px 70px
+    );
+  }
+
+  .shell[data-wall='zinc'] .wall-layer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(115deg, rgba(255, 255, 255, 0.04) 0%, transparent 40%),
+      linear-gradient(295deg, rgba(0, 0, 0, 0.45) 0%, transparent 45%);
   }
 
   .settings {
     position: relative;
     z-index: 1;
-    min-height: 100vh;
-    padding: 20px 18px 16px;
+    height: 100%;
+    padding: 12px 12px 10px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
     box-sizing: border-box;
+    min-height: 0;
   }
 
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 2px 2px 6px;
+    gap: 8px;
+    flex: 0 0 auto;
+    padding: 0 2px 2px;
   }
 
   .status {
-    width: 8px;
-    height: 8px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex: 0 0 auto;
     background: radial-gradient(circle at 35% 30%, #fecaca, #ef4444 45%, #dc2626);
-    box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+    box-shadow: 0 0 8px rgba(239, 68, 68, 0.65);
     animation: pulse 1.3s ease-in-out infinite;
   }
 
@@ -223,35 +332,56 @@
 
   h1 {
     margin: 0;
-    font-size: 17px;
+    font-size: 15px;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: #fff;
   }
 
   .sub {
-    margin: 1px 0 0;
-    font-size: 11px;
+    margin: 0;
+    font-size: 10px;
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.38);
   }
 
   .ver {
-    font-size: 10px;
+    font-size: 9px;
     letter-spacing: 0.12em;
-    color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.28);
   }
 
-  /* Frosted panel — same material language as overlay capsule */
+  .scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  }
+
+  .scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 99px;
+  }
+
   .panel {
     position: relative;
-    border-radius: 16px;
+    border-radius: 14px;
     overflow: hidden;
     border: none;
+    flex: 0 0 auto;
     box-shadow:
-      0 10px 28px rgba(0, 0, 0, 0.35),
-      0 2px 6px rgba(0, 0, 0, 0.25);
+      0 8px 22px rgba(0, 0, 0, 0.32),
+      0 1px 4px rgba(0, 0, 0, 0.22);
   }
 
   .frost {
@@ -279,7 +409,7 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    opacity: 0.35;
+    opacity: 0.32;
     mix-blend-mode: overlay;
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
     background-size: 120px 120px;
@@ -290,22 +420,22 @@
     z-index: 1;
     display: flex;
     flex-direction: column;
-    gap: 11px;
-    padding: 13px;
+    gap: 8px;
+    padding: 10px;
   }
 
   .field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 4px;
   }
 
   .label {
-    font-size: 10px;
+    font-size: 9.5px;
     font-weight: 600;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.42);
   }
 
   .label em {
@@ -313,24 +443,23 @@
     font-weight: 400;
     letter-spacing: 0.02em;
     text-transform: none;
-    color: rgba(255, 255, 255, 0.28);
-    margin-left: 5px;
+    color: rgba(255, 255, 255, 0.26);
+    margin-left: 4px;
   }
 
   input,
   select {
-    padding: 8px 11px;
+    padding: 7px 10px;
     border-radius: 999px;
     border: none;
     background: rgba(0, 0, 0, 0.35);
     color: rgba(255, 255, 255, 0.92);
-    font-size: 13px;
+    font-size: 12.5px;
     font-family: inherit;
     outline: none;
     box-shadow:
       inset 0 1px 2px rgba(255, 255, 255, 0.06),
       inset 0 -2px 6px rgba(0, 0, 0, 0.35);
-    transition: background 0.15s ease, box-shadow 0.15s ease;
   }
 
   select {
@@ -338,13 +467,13 @@
     background-image: linear-gradient(45deg, transparent 50%, rgba(255, 255, 255, 0.45) 50%),
       linear-gradient(135deg, rgba(255, 255, 255, 0.45) 50%, transparent 50%);
     background-position:
-      calc(100% - 16px) 50%,
-      calc(100% - 11px) 50%;
+      calc(100% - 15px) 50%,
+      calc(100% - 10px) 50%;
     background-size:
       5px 5px,
       5px 5px;
     background-repeat: no-repeat;
-    padding-right: 28px;
+    padding-right: 26px;
   }
 
   input:focus,
@@ -357,7 +486,7 @@
   }
 
   input::placeholder {
-    color: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.26);
   }
 
   .segmented {
@@ -373,16 +502,15 @@
 
   .segmented button {
     flex: 1;
-    padding: 7px 0;
+    padding: 6px 0;
     border: none;
     border-radius: 999px;
     background: transparent;
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 12px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 11.5px;
     font-family: inherit;
     font-weight: 500;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
   }
 
   .segmented button.active {
@@ -393,13 +521,82 @@
       0 2px 8px rgba(0, 0, 0, 0.25);
   }
 
+  .walls {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+
+  .wall-pick {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    color: rgba(255, 255, 255, 0.45);
+    font-family: inherit;
+  }
+
+  .wall-preview {
+    display: block;
+    height: 44px;
+    border-radius: 10px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .wall-pick.active .wall-preview {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.28),
+      0 0 0 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .wall-pick.active .wall-name {
+    color: #fff;
+  }
+
+  .wall-name {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding-left: 2px;
+  }
+
+  .wall-pick.blueprint .wall-preview {
+    background-color: #071018;
+    background-image:
+      linear-gradient(rgba(56, 189, 248, 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(56, 189, 248, 0.2) 1px, transparent 1px);
+    background-size: 10px 10px;
+  }
+
+  .wall-pick.signal .wall-preview {
+    background-color: #050805;
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(34, 197, 94, 0.22) 0 1px,
+      transparent 1px 3px
+    );
+  }
+
+  .wall-pick.zinc .wall-preview {
+    background-image: repeating-linear-gradient(
+      -32deg,
+      #121417 0 8px,
+      #1a1d22 8px 16px,
+      #0e1013 16px 20px
+    );
+  }
+
   .save {
-    margin-top: auto;
-    position: relative;
-    padding: 11px;
+    flex: 0 0 auto;
+    padding: 9px;
     border: none;
     border-radius: 999px;
-    overflow: hidden;
     background:
       linear-gradient(
         165deg,
@@ -412,24 +609,18 @@
     backdrop-filter: blur(16px) saturate(160%);
     color: #fff;
     font-family: inherit;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 650;
     letter-spacing: 0.04em;
     cursor: pointer;
     box-shadow:
-      0 10px 28px rgba(0, 0, 0, 0.35),
+      0 8px 22px rgba(0, 0, 0, 0.32),
       inset 0 1px 1px rgba(255, 255, 255, 0.14),
       inset 0 -8px 16px rgba(0, 0, 0, 0.28);
-    transition: transform 0.12s ease, filter 0.15s ease;
   }
 
   .save:hover {
     filter: brightness(1.08);
-    transform: translateY(-1px);
-  }
-
-  .save:active {
-    transform: translateY(0);
   }
 
   .save.saved {

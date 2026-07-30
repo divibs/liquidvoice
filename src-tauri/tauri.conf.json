@@ -30,12 +30,14 @@
       {
         "label": "settings",
         "title": "LiquidVoice Settings",
-        "width": 360,
-        "height": 440,
-        "resizable": false,
+        "width": 380,
+        "height": 520,
+        "resizable": true,
         "skipTaskbar": true,
         "visible": false,
-        "url": "/settings"
+        "url": "/settings",
+        "minWidth": 320,
+        "minHeight": 420
       }
     ],
     "security": {

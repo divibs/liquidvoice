@@ -30,7 +30,7 @@ impl Default for AppConfig {
             trigger_mode: TriggerMode::PushToTalk,
             language: String::new(),
             prompt: String::new(),
-            theme: "auto".into(),
+            theme: "blueprint".into(),
             max_recording_sec: 60,
         }
     }
