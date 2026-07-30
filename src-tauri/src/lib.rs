@@ -75,14 +75,13 @@ pub fn run() {
             if let Some(overlay) = app.get_webview_window("overlay") {
                 if let Ok(Some(monitor)) = overlay.primary_monitor() {
                     let screen_w = monitor.size().width as i32;
-                    let screen_h = monitor.size().height as i32;
                     let scale = monitor.scale_factor();
                     let win_w = (460.0 * scale) as i32;
-                    let win_h = (120.0 * scale) as i32;
+                    // Top-center of primary monitor (was bottom-center).
                     let _ = overlay.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition {
                             x: (screen_w - win_w) / 2,
-                            y: screen_h - win_h - (100.0 * scale) as i32,
+                            y: (48.0 * scale) as i32,
                         },
                     ));
                 }
