@@ -1,94 +1,96 @@
 <script lang="ts">
   import { listen } from '@tauri-apps/api/event';
   import { onMount } from 'svelte';
-  import Metaballs from '../components/Metaballs.svelte';
-  import WaveformBars from '../components/WaveformBars.svelte';
-  import StatusText from '../components/StatusText.svelte';
+  import Capsule from '../components/Capsule.svelte';
   import '@fontsource-variable/space-grotesk';
 
-  type AppState = 'hidden' | 'listening' | 'processing' | 'done' | 'error';
+  type Mode = 'listen' | 'process' | 'error';
 
-  let state = $state<AppState>('hidden');
-  let micLevel = $state(0);
-  let errorMsg = $state('');
   let visible = $state(false);
+  let target = $state<0 | 1>(0);
+  let mode = $state<Mode>('listen');
+  let level = $state(0);
+  let elapsed = $state(0);
+  let errorMsg = $state('');
 
+  let startTs = 0;
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
+  // timer ticks while listening
+  $effect(() => {
+    if (!visible || mode !== 'listen') return;
+    let raf = 0;
+    const tick = () => {
+      elapsed = Math.floor((performance.now() - startTs) / 1000);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  });
 
   onMount(() => {
     if (!isTauri) {
+      // dev preview: play the morph + fake mic + counting timer
       document.documentElement.classList.add('dev');
       visible = true;
-      state = 'listening';
-      let t = 0;
-      const interval = setInterval(() => {
-        t += 0.08;
-        micLevel = 0.12 + Math.abs(Math.sin(t)) * 0.35 + Math.random() * 0.08;
+      target = 1;
+      mode = 'listen';
+      startTs = performance.now();
+      let k = 0;
+      const id = setInterval(() => {
+        k += 0.08;
+        level = 0.12 + Math.abs(Math.sin(k)) * 0.4 + Math.random() * 0.06;
       }, 50);
-      return () => clearInterval(interval);
+      return () => clearInterval(id);
     }
 
-    const unlisteners: (() => void)[] = [];
+    const off: (() => void)[] = [];
 
     listen<number>('mic-level', (e) => {
-      micLevel = e.payload;
-    }).then(fn => unlisteners.push(fn));
+      if (mode === 'listen') level = e.payload;
+    }).then((fn) => off.push(fn));
 
     listen<string>('state', (e) => {
-      const s = e.payload as AppState;
-      state = s;
-      if (s === 'listening' || s === 'processing' || s === 'error') {
+      const s = e.payload;
+      if (s === 'listening') {
+        errorMsg = '';
+        elapsed = 0;
+        level = 0;
+        startTs = performance.now();
+        mode = 'listen';
         visible = true;
+        target = 1;
+      } else if (s === 'processing') {
+        mode = 'process';
+      } else if (s === 'done') {
+        target = 0; // collapse back to a dot, then unmount
+      } else if (s === 'error') {
+        mode = 'error';
+        target = 1;
+        visible = true;
+        setTimeout(() => (target = 0), 5000);
       }
-      if (s === 'done') {
-        setTimeout(() => { visible = false; state = 'hidden'; }, 600);
-      }
-      if (s === 'error') {
-        setTimeout(() => { visible = false; state = 'hidden'; }, 5000);
-      }
-    }).then(fn => unlisteners.push(fn));
+    }).then((fn) => off.push(fn));
 
     listen<string>('error-msg', (e) => {
       errorMsg = e.payload;
-    }).then(fn => unlisteners.push(fn));
+    }).then((fn) => off.push(fn));
 
-    return () => unlisteners.forEach(fn => fn());
+    return () => off.forEach((fn) => fn());
   });
+
+  function collapsed() {
+    visible = false;
+    mode = 'listen';
+  }
 </script>
 
-<div
-  class="stage"
-  class:visible
-  class:error={state === 'error'}
-  style="--level: {micLevel};"
->
+<div class="stage" class:visible class:shake={mode === 'error' && visible}>
   {#if visible}
-    <div class="glow" class:fast={state === 'processing'}></div>
-
-    <div class="pill-border" class:fast={state === 'processing'} class:err={state === 'error'}>
-      <div class="pill">
-        <Metaballs level={micLevel} active={state === 'listening'} />
-
-        {#if state === 'listening'}
-          <WaveformBars level={micLevel} />
-        {:else if state === 'processing'}
-          <div class="loading">
-            {#each Array(3) as _, i}
-              <span style="animation-delay: {i * 0.15}s"></span>
-            {/each}
-          </div>
-        {:else if state === 'done'}
-          <svg class="check" viewBox="0 0 24 24" width="20" height="20">
-            <path d="M5 13l4 4L19 7" fill="none" stroke="#5eead4" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round" pathLength="1" />
-          </svg>
-        {:else if state === 'error'}
-          <span class="bang">!</span>
-        {/if}
-      </div>
-    </div>
-
-    <StatusText {state} {errorMsg} />
+    <Capsule {level} {target} {elapsed} {mode} onCollapsed={collapsed} />
+    {#if mode === 'error' && errorMsg}
+      <p class="caption">{errorMsg}</p>
+    {/if}
   {/if}
 </div>
 
@@ -102,9 +104,9 @@
 
   :global(html.dev body) {
     background:
-      radial-gradient(900px 500px at 70% 20%, rgba(34, 211, 238, 0.08), transparent 60%),
-      radial-gradient(700px 400px at 20% 80%, rgba(251, 191, 36, 0.05), transparent 60%),
-      linear-gradient(160deg, #10161d, #0a0f14 55%, #0d1219);
+      radial-gradient(820px 460px at 68% 22%, rgba(124, 58, 237, 0.12), transparent 62%),
+      radial-gradient(640px 380px at 22% 82%, rgba(217, 70, 239, 0.06), transparent 62%),
+      linear-gradient(160deg, #0c0a14, #08060d 55%, #0a0810);
   }
 
   .stage {
@@ -113,129 +115,35 @@
     align-items: center;
     justify-content: center;
     height: 100vh;
+    gap: 6px;
     opacity: 0;
-    transform: translateY(26px) scale(0.82);
-    transition:
-      opacity 0.28s ease,
-      transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition: opacity 0.2s ease;
   }
 
   .stage.visible {
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 
-  .stage.error {
+  .stage.shake {
     animation: shake 0.4s ease;
   }
 
-  /* ambient light spill behind the pill, intensity follows mic level */
-  .glow {
-    position: absolute;
-    width: 250px;
-    height: 60px;
-    border-radius: 999px;
-    background: conic-gradient(from var(--angle, 0deg),
-      #22d3ee, #2dd4bf, #34d399, #22d3ee);
-    filter: blur(22px);
-    opacity: calc(0.25 + var(--level) * 0.55);
-    animation: spin 5s linear infinite;
-    transition: opacity 0.15s ease-out;
-  }
-
-  .glow.fast {
-    animation-duration: 1.6s;
-    opacity: 0.7;
-  }
-
-  .pill-border {
-    position: relative;
-    width: 240px;
-    height: 52px;
-    border-radius: 999px;
-    padding: 1.5px;
-    background: conic-gradient(from var(--angle, 0deg),
-      #22d3ee, #2dd4bf 30%, #34d399 55%, #0e7490 80%, #22d3ee);
-    animation: spin 4s linear infinite;
-  }
-
-  .pill-border.fast {
-    animation-duration: 1.2s;
-  }
-
-  .pill-border.err {
-    background: conic-gradient(from var(--angle, 0deg),
-      #fb7185, #f43f5e 40%, #fb7185);
-  }
-
-  .pill {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    border-radius: 999px;
-    background: rgba(10, 17, 22, 0.55);
-    backdrop-filter: blur(22px) saturate(1.5);
-    -webkit-backdrop-filter: blur(22px) saturate(1.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .loading {
-    display: flex;
-    gap: 7px;
-    z-index: 1;
-  }
-
-  .loading span {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #2dd4bf;
-    animation: bounce 0.7s ease-in-out infinite;
-  }
-
-  .check {
-    z-index: 1;
-  }
-
-  .check path {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw 0.35s ease forwards;
-  }
-
-  .bang {
-    font-family: 'Space Grotesk Variable', sans-serif;
-    font-weight: 700;
-    font-size: 20px;
+  .caption {
+    margin: 0;
+    font-family: 'Space Grotesk Variable', 'Segoe UI', sans-serif;
+    font-size: 10px;
+    letter-spacing: 0.04em;
     color: #fda4af;
-    z-index: 1;
-  }
-
-  @keyframes bounce {
-    0%, 100% { transform: translateY(0); opacity: 0.5; }
-    50% { transform: translateY(-6px); opacity: 1; }
-  }
-
-  @keyframes draw {
-    to { stroke-dashoffset: 0; }
+    text-align: center;
+    max-width: 360px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   @keyframes shake {
     0%, 100% { transform: translateX(0); }
     25% { transform: translateX(-6px); }
     75% { transform: translateX(6px); }
-  }
-
-  @keyframes spin {
-    to { --angle: 360deg; }
-  }
-
-  @property --angle {
-    syntax: '<angle>';
-    initial-value: 0deg;
-    inherits: false;
   }
 </style>

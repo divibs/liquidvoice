@@ -112,11 +112,11 @@
     display: flex;
     flex-direction: column;
     gap: 16px;
-    color: #d6f5f7;
+    color: #ede9fe;
     background:
-      radial-gradient(420px 240px at 85% -10%, rgba(34, 211, 238, 0.1), transparent 65%),
-      radial-gradient(360px 220px at -10% 105%, rgba(251, 191, 36, 0.05), transparent 65%),
-      linear-gradient(165deg, #0d141a, #0a0f14 60%, #0c1218);
+      radial-gradient(420px 240px at 85% -10%, rgba(139, 92, 246, 0.14), transparent 65%),
+      radial-gradient(360px 220px at -10% 105%, rgba(217, 70, 239, 0.07), transparent 65%),
+      linear-gradient(165deg, #0d0a16, #08060d 60%, #0a0812);
   }
 
   header {
@@ -129,8 +129,8 @@
     width: 9px;
     height: 9px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #22d3ee, #2dd4bf);
-    box-shadow: 0 0 10px rgba(45, 212, 191, 0.7);
+    background: linear-gradient(135deg, #c084fc, #8b5cf6);
+    box-shadow: 0 0 10px rgba(139, 92, 246, 0.7);
     align-self: center;
     animation: pulse 2.4s ease-in-out infinite;
   }
@@ -141,13 +141,13 @@
     font-weight: 700;
     letter-spacing: -0.01em;
     margin: 0;
-    color: #ecfeff;
+    color: #f5f3ff;
   }
 
   .ver {
     font-size: 10px;
     letter-spacing: 0.14em;
-    color: rgba(103, 232, 249, 0.45);
+    color: rgba(196, 167, 255, 0.45);
   }
 
   section {
@@ -157,7 +157,7 @@
     padding: 13px;
     border-radius: 10px;
     background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(103, 232, 249, 0.08);
+    border: 1px solid rgba(196, 167, 255, 0.09);
   }
 
   .field {
@@ -171,7 +171,7 @@
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: rgba(165, 243, 252, 0.55);
+    color: rgba(196, 167, 255, 0.55);
   }
 
   .label em {
@@ -179,16 +179,16 @@
     font-weight: 400;
     letter-spacing: 0.04em;
     text-transform: none;
-    color: rgba(165, 243, 252, 0.3);
+    color: rgba(196, 167, 255, 0.3);
     margin-left: 5px;
   }
 
   input, select {
     padding: 7px 11px;
     border-radius: 7px;
-    border: 1px solid rgba(103, 232, 249, 0.14);
-    background: rgba(8, 14, 18, 0.7);
-    color: #e0fcff;
+    border: 1px solid rgba(196, 167, 255, 0.16);
+    background: rgba(10, 8, 18, 0.7);
+    color: #ede9fe;
     font-size: 13px;
     font-family: inherit;
     outline: none;
@@ -196,12 +196,12 @@
   }
 
   input:focus, select:focus {
-    border-color: rgba(45, 212, 191, 0.6);
-    box-shadow: 0 0 0 3px rgba(45, 212, 191, 0.12);
+    border-color: rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.14);
   }
 
   input::placeholder {
-    color: rgba(165, 243, 252, 0.25);
+    color: rgba(196, 167, 255, 0.25);
   }
 
   .segmented {
@@ -209,8 +209,8 @@
     gap: 4px;
     padding: 3px;
     border-radius: 8px;
-    background: rgba(8, 14, 18, 0.7);
-    border: 1px solid rgba(103, 232, 249, 0.14);
+    background: rgba(10, 8, 18, 0.7);
+    border: 1px solid rgba(196, 167, 255, 0.16);
   }
 
   .segmented button {
@@ -219,7 +219,7 @@
     border: none;
     border-radius: 6px;
     background: transparent;
-    color: rgba(165, 243, 252, 0.5);
+    color: rgba(196, 167, 255, 0.5);
     font-size: 12px;
     font-family: inherit;
     cursor: pointer;
@@ -227,9 +227,9 @@
   }
 
   .segmented button.active {
-    background: linear-gradient(135deg, rgba(34, 211, 238, 0.18), rgba(45, 212, 191, 0.18));
-    color: #a5f3fc;
-    box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.35);
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.22), rgba(192, 132, 252, 0.18));
+    color: #ddd6fe;
+    box-shadow: inset 0 0 0 1px rgba(139, 92, 246, 0.4);
   }
 
   .save {
@@ -237,21 +237,21 @@
     padding: 10px;
     border: none;
     border-radius: 8px;
-    background: linear-gradient(135deg, #06b6d4, #14b8a6);
-    color: #04141a;
+    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    color: #f5f3ff;
     font-family: 'Space Grotesk Variable', sans-serif;
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 0.04em;
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
-    box-shadow: 0 4px 18px rgba(20, 184, 166, 0.25);
+    box-shadow: 0 4px 18px rgba(124, 58, 237, 0.3);
   }
 
   .save:hover {
-    filter: brightness(1.1);
+    filter: brightness(1.12);
     transform: translateY(-1px);
-    box-shadow: 0 6px 22px rgba(20, 184, 166, 0.35);
+    box-shadow: 0 6px 22px rgba(124, 58, 237, 0.42);
   }
 
   .save:active {
@@ -259,11 +259,11 @@
   }
 
   .save.saved {
-    background: linear-gradient(135deg, #34d399, #2dd4bf);
+    background: linear-gradient(135deg, #a78bfa, #8b5cf6);
   }
 
   @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 6px rgba(45, 212, 191, 0.5); }
-    50% { box-shadow: 0 0 14px rgba(45, 212, 191, 0.9); }
+    0%, 100% { box-shadow: 0 0 6px rgba(139, 92, 246, 0.5); }
+    50% { box-shadow: 0 0 14px rgba(139, 92, 246, 0.95); }
   }
 </style>
