@@ -12,7 +12,22 @@
   let errorMsg = $state('');
   let visible = $state(false);
 
+  const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+
   onMount(() => {
+    // Dev preview: simulate listening state with fake mic levels
+    if (!isTauri) {
+      document.documentElement.classList.add('dev');
+      visible = true;
+      state = 'listening';
+      let t = 0;
+      const interval = setInterval(() => {
+        t += 0.1;
+        micLevel = 0.15 + Math.abs(Math.sin(t)) * 0.4;
+      }, 50);
+      return () => clearInterval(interval);
+    }
+
     const unlisteners: (() => void)[] = [];
 
     listen<number>('mic-level', (e) => {
@@ -62,6 +77,10 @@
     overflow: hidden;
     pointer-events: none;
     user-select: none;
+  }
+
+  :global(html.dev body) {
+    background: #111113;
   }
 
   .overlay {
