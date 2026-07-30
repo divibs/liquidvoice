@@ -15,70 +15,91 @@
     onCollapsed?: () => void;
   }>();
 
-  let p = $state(0); // morph progress 0..1
-  let t = $state(0); // animation clock
-  let notified = false;
+  // raw = linear morph position 0..1 (drives a single timeline, plays forward & back)
+  let raw = $state(0);
+  let lvl = $state(0); // mic level, smoothed
+  let wt = $state(0); // slow waveform clock
+  let pt = $state(0); // pulse clock (status dot / glow breathe)
+  let collapsed = false;
 
-  // single rAF loop: tween morph + advance clock (reads via untrack so it runs once)
+  const OPEN = 560; // ms dot -> capsule
+  const CLOSE = 440; // ms capsule -> dot
+
   $effect(() => {
     let raf = 0;
-    const loop = () => {
+    let last = performance.now();
+    const loop = (now: number) => {
+      const dt = Math.min(50, now - last);
+      last = now;
+
       const tgt = untrack(() => target);
-      p += (tgt - p) * 0.2;
-      if (Math.abs(tgt - p) < 0.008) {
-        p = tgt;
-        if (tgt === 0 && !notified) {
-          notified = true;
-          untrack(() => onCollapsed)();
-        }
-      } else {
-        notified = false;
+      raw = tgt === 1 ? Math.min(1, raw + dt / OPEN) : Math.max(0, raw - dt / CLOSE);
+
+      const lv = untrack(() => level);
+      const md = untrack(() => mode);
+      const want = md === 'process' ? 0.05 : lv;
+      lvl += (want - lvl) * Math.min(1, dt * 0.012);
+
+      wt += dt * 0.0022; // gentle traveling wave
+      pt += dt * 0.004;
+
+      if (tgt === 0 && raw <= 0 && !collapsed) {
+        collapsed = true;
+        untrack(() => onCollapsed)();
+      } else if (tgt === 1) {
+        collapsed = false;
       }
-      t += 0.05;
+
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
   });
 
-  const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
   const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
   const smooth = (e0: number, e1: number, x: number) => {
     const u = clamp01((x - e0) / (e1 - e0));
     return u * u * (3 - 2 * u);
   };
+  const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
 
-  // geometry from morph progress
-  const leftCx = $derived(lerp(210, 44, p));
-  const rightCx = $derived(lerp(210, 384, p));
-  const capR = $derived(lerp(7, 30, p));
-  const rectGrow = $derived(smooth(0.2, 0.8, p));
-  const rectH = $derived(lerp(0, 52, rectGrow));
-  const rectW = $derived(Math.max(0, rightCx - leftCx));
+  // staged sub-eases over the single timeline
+  const sep = smooth(0.14, 0.62, raw); // caps pull apart (the stretch)
+  const grow = smooth(0.0, 0.5, raw); // dot swells from the very first frame
+  const neck = smooth(0.12, 0.96, raw); // liquid neck fills -> true capsule at 1
 
-  const co = $derived(smooth(0.3, 0.92, p)); // content opacity
-  const cs = $derived(lerp(0.82, 1, smooth(0.4, 1, p))); // content settle scale
+  const CX = 210;
+  const capR = lerp(8, 26, grow);
+  const half = lerp(0, 170, sep);
+  const leftCx = CX - half;
+  const rightCx = CX + half;
+  const rectH = lerp(0, 52, neck); // == 2*capR at rest => perfect capsule, no peanut
+  const rectW = Math.max(0, rightCx - leftCx);
 
-  const effLevel = $derived(mode === 'process' ? 0.06 : level);
+  const co = smooth(0.34, 0.95, raw); // inner elements bloom in as glass forms
+
+  // damped settle wobble on the last beat (and reversed on close)
+  const sw = smooth(0.62, 1.0, raw);
+  const groupScale = 1 + Math.sin(sw * Math.PI) * 0.06 * (1 - sw);
+
   const rim = $derived(mode === 'error' ? '#fb7185' : '#c4a7ff');
-  const glow = $derived(mode === 'error' ? 'rgba(244,63,94,0.55)' : 'rgba(139,92,246,0.6)');
+  const glowCol = $derived(mode === 'error' ? 'rgba(244,63,94,0.55)' : 'rgba(139,92,246,0.6)');
   const glowOp = $derived(
-    clamp01((0.22 + effLevel * 0.5) * co + 0.05 * Math.sin(t * 1.3) + 0.05),
+    clamp01((0.2 + lvl * 0.5) * co + 0.04 * Math.sin(pt * 1.3) + 0.05),
   );
 
   const mm = $derived(String(Math.floor(elapsed / 60)).padStart(2, '0'));
   const ss = $derived(String(elapsed % 60).padStart(2, '0'));
 
-  // tapered waveform
+  // tapered spectrum: dots at the ends, tall in the middle, slow traveling motion
   const N = 23;
-  const x0 = 92;
-  const span = 208;
+  const X0 = 82;
+  const SPAN = 186;
   function bar(i: number) {
-    const e = Math.sin((Math.PI * i) / (N - 1)); // 0 at ends → dots, 1 mid
-    const live = 0.45 + 0.55 * Math.abs(Math.sin(t * 3 + i * 0.6));
-    const h = 2 + e * (4 + effLevel * 30) * live;
-    const x = x0 + (span * i) / (N - 1);
-    return { x, h };
+    const taper = Math.sin((Math.PI * i) / (N - 1));
+    const wave = 0.55 + 0.45 * Math.sin(wt + i * 0.55);
+    const h = 2 + taper * (3 + lvl * 26) * (0.6 + 0.4 * wave);
+    return { x: X0 + (SPAN * i) / (N - 1), h };
   }
 </script>
 
@@ -98,6 +119,7 @@
       <stop offset="100%" stop-color="#8b5cf6" />
     </linearGradient>
 
+    <!-- goo merge + extracted liquid rim -->
     <filter id="glassF" x="-20%" y="-55%" width="140%" height="210%">
       <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b" />
       <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo" />
@@ -121,54 +143,52 @@
   <ellipse
     cx="210"
     cy="40"
-    rx={lerp(16, 172, p)}
-    ry={lerp(5, 24, p)}
-    fill={glow}
+    rx={lerp(16, 176, raw)}
+    ry={lerp(5, 24, raw)}
+    fill={glowCol}
     opacity={glowOp}
     filter="url(#glowF)"
   />
 
-  <!-- liquid glass body (dot -> peanut -> pill) -->
-  <g filter="url(#glassF)">
-    <circle cx={leftCx} cy={32} r={capR} fill="url(#glass)" />
-    <rect x={leftCx} y={32 - rectH / 2} width={rectW} height={rectH} rx={rectH / 2} fill="url(#glass)" />
-    <circle cx={rightCx} cy={32} r={capR} fill="url(#glass)" />
-  </g>
-
-  <!-- contents bloom in as the pill settles -->
-  <g opacity={co} transform="translate(210 32) scale({cs}) translate(-210 -32)">
-    <!-- mic well -->
-    <circle cx={leftCx} cy={32} r={20} fill="rgba(10,7,18,0.45)" stroke={rim} stroke-opacity="0.4" stroke-width="1" />
-    <g transform="translate({leftCx - 9} 23)" stroke="#d8b4fe" fill="none" stroke-width="1.6" stroke-linecap="round">
-      <rect x="6.5" y="2" width="5" height="9" rx="2.5" fill="#d8b4fe" stroke="none" />
-      <path d="M4.5 8.5 a4.5 4.5 0 0 0 9 0" />
-      <line x1="9" y1="13" x2="9" y2="16" />
-      <line x1="6" y1="16" x2="12" y2="16" />
+  <!-- whole body settles as one liquid mass -->
+  <g transform="translate(210 32) scale({groupScale}) translate(-210 -32)">
+    <g filter="url(#glassF)">
+      <circle cx={leftCx} cy={32} r={capR} fill="url(#glass)" />
+      <rect x={leftCx} y={32 - rectH / 2} width={rectW} height={rectH} rx={rectH / 2} fill="url(#glass)" />
+      <circle cx={rightCx} cy={32} r={capR} fill="url(#glass)" />
     </g>
 
-    <!-- tapered waveform -->
-    {#each Array(N) as _, i}
-      {@const b = bar(i)}
-      <rect x={b.x - 1.5} y={32 - b.h / 2} width="3" height={b.h} rx="1.5" fill="url(#barG)" />
-    {/each}
+    <!-- contents bloom in once the glass has a shape -->
+    <g opacity={co}>
+      <circle cx={leftCx} cy={32} r={20} fill="rgba(10,7,18,0.45)" stroke={rim} stroke-opacity="0.4" stroke-width="1" />
+      <g transform="translate({leftCx - 9} 23)" stroke="#d8b4fe" fill="none" stroke-width="1.6" stroke-linecap="round">
+        <rect x="6.5" y="2" width="5" height="9" rx="2.5" fill="#d8b4fe" stroke="none" />
+        <path d="M4.5 8.5 a4.5 4.5 0 0 0 9 0" />
+        <line x1="9" y1="13" x2="9" y2="16" />
+        <line x1="6" y1="16" x2="12" y2="16" />
+      </g>
 
-    <!-- divider + timer -->
-    <line x1="312" y1="20" x2="312" y2="44" stroke={rim} stroke-opacity="0.3" stroke-width="1" />
-    <text
-      x="324"
-      y="37"
-      fill="rgba(233,224,255,0.92)"
-      font-family="'Space Grotesk Variable', sans-serif"
-      font-size="13"
-      letter-spacing="0.5"
-    >{mm}:{ss}</text>
+      {#each Array(N) as _, i}
+        {@const b = bar(i)}
+        <rect x={b.x - 1.5} y={32 - b.h / 2} width="3" height={b.h} rx="1.5" fill="url(#barG)" />
+      {/each}
 
-    <!-- status dot -->
-    <circle cx="392" cy="32" r={mode === 'process' ? 6 + Math.sin(t * 6) * 1.4 : 6} fill="url(#dotG)">
-      {#if mode === 'process'}
-        <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
-      {/if}
-    </circle>
+      <line x1="288" y1="20" x2="288" y2="44" stroke={rim} stroke-opacity="0.3" stroke-width="1" />
+      <text
+        x="300"
+        y="37"
+        fill="rgba(233,224,255,0.92)"
+        font-family="'Space Grotesk Variable', sans-serif"
+        font-size="13"
+        letter-spacing="0.5"
+      >{mm}:{ss}</text>
+
+      <circle cx={rightCx} cy={32} r={mode === 'process' ? 6 + Math.sin(pt * 6) * 1.4 : 6} fill="url(#dotG)">
+        {#if mode === 'process'}
+          <animate attributeName="opacity" values="1;0.4;1" dur="0.9s" repeatCount="indefinite" />
+        {/if}
+      </circle>
+    </g>
   </g>
 </svg>
 

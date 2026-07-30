@@ -117,7 +117,7 @@
     height: 100vh;
     gap: 6px;
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.12s ease;
   }
 
   .stage.visible {
