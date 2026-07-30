@@ -15,11 +15,11 @@
     onCollapsed?: () => void;
   }>();
 
-  // raw = linear morph position 0..1 (drives a single timeline, plays forward & back)
+  // raw = linear morph position 0..1 (one timeline, plays forward & back)
   let raw = $state(0);
   let lvl = $state(0); // mic level, smoothed
   let wt = $state(0); // slow waveform clock
-  let pt = $state(0); // pulse clock (status dot / glow breathe)
+  let pt = $state(0); // pulse clock (status dot / idle breathe)
   let collapsed = false;
 
   const OPEN = 560; // ms dot -> capsule
@@ -63,24 +63,26 @@
   };
   const lerp = (a: number, b: number, x: number) => a + (b - a) * x;
 
-  // staged sub-eases over the single timeline
-  const sep = smooth(0.14, 0.62, raw); // caps pull apart (the stretch)
-  const grow = smooth(0.0, 0.5, raw); // dot swells from the very first frame
-  const neck = smooth(0.12, 0.96, raw); // liquid neck fills -> true capsule at 1
+  // staged sub-eases over the single timeline (all reactive)
+  const sep = $derived(smooth(0.14, 0.62, raw)); // caps pull apart (the stretch)
+  const grow = $derived(smooth(0.0, 0.5, raw)); // dot swells from frame one
+  const neck = $derived(smooth(0.12, 0.96, raw)); // liquid neck fills -> true capsule at 1
 
   const CX = 210;
-  const capR = lerp(8, 26, grow);
-  const half = lerp(0, 170, sep);
-  const leftCx = CX - half;
-  const rightCx = CX + half;
-  const rectH = lerp(0, 52, neck); // == 2*capR at rest => perfect capsule, no peanut
-  const rectW = Math.max(0, rightCx - leftCx);
+  const capR = $derived(lerp(8, 26, grow));
+  const half = $derived(lerp(0, 170, sep));
+  const leftCx = $derived(CX - half);
+  const rightCx = $derived(CX + half);
+  const rectH = $derived(lerp(0, 52, neck)); // == 2*capR at rest => clean capsule, no peanut
+  const rectW = $derived(Math.max(0, rightCx - leftCx));
 
-  const co = smooth(0.34, 0.95, raw); // inner elements bloom in as glass forms
+  const co = $derived(smooth(0.34, 0.95, raw)); // inner elements bloom in as glass forms
 
-  // damped settle wobble on the last beat (and reversed on close)
-  const sw = smooth(0.62, 1.0, raw);
-  const groupScale = 1 + Math.sin(sw * Math.PI) * 0.06 * (1 - sw);
+  // damped settle wobble on the last beat + a constant idle breathe
+  const sw = $derived(smooth(0.62, 1.0, raw));
+  const groupScale = $derived(
+    (1 + Math.sin(sw * Math.PI) * 0.06 * (1 - sw)) * (1 + Math.sin(pt * 1.5) * 0.012),
+  );
 
   const rim = $derived(mode === 'error' ? '#fb7185' : '#c4a7ff');
   const glowCol = $derived(mode === 'error' ? 'rgba(244,63,94,0.55)' : 'rgba(139,92,246,0.6)');
