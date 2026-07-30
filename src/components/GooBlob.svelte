@@ -65,7 +65,7 @@
   </g>
 
   <rect
-    x="1" y="1" width="278" height="70" rx="35"
+    x="1" y="1" width="198" height="54" rx="27"
     fill="none"
     stroke="rgba(255,255,255,0.08)"
     stroke-width="1"

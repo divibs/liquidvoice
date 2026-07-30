@@ -44,7 +44,7 @@
         setTimeout(() => { visible = false; state = 'hidden'; }, 600);
       }
       if (s === 'error') {
-        setTimeout(() => { visible = false; state = 'hidden'; }, 2500);
+        setTimeout(() => { visible = false; state = 'hidden'; }, 5000);
       }
     }).then(fn => unlisteners.push(fn));
 
@@ -105,8 +105,8 @@
 
   .blob-container {
     position: relative;
-    width: 280px;
-    height: 72px;
+    width: 200px;
+    height: 56px;
     display: flex;
     align-items: center;
     justify-content: center;

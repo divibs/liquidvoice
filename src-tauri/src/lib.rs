@@ -74,7 +74,7 @@ pub fn run() {
                 if let Ok(Some(monitor)) = overlay.primary_monitor() {
                     let screen_w = monitor.size().width as i32;
                     let scale = monitor.scale_factor();
-                    let win_w = (480.0 * scale) as i32;
+                    let win_w = (320.0 * scale) as i32;
                     let _ = overlay.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition {
                             x: (screen_w - win_w) / 2,
