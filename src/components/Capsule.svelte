@@ -108,6 +108,9 @@
   style:--uy="{uiY}px"
 >
   <div class="glass">
+    <!-- blur layer: never put isolation:isolate on the blur surface (kills frost) -->
+    <div class="frost" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
     <div class="chrome">
       <div class="mic" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -144,33 +147,74 @@
   }
 
   .glass {
+    position: relative;
     width: var(--w, 12px);
     height: var(--h, 12px);
     border-radius: 999px;
     border: none;
     overflow: hidden;
-    isolation: isolate;
-    /* dark frost — works on transparent overlay; blurs stage chrome in dev */
-    background: rgba(6, 6, 12, 0.55);
-    -webkit-backdrop-filter: blur(16px) saturate(185%) brightness(0.92);
-    backdrop-filter: blur(16px) saturate(185%) brightness(0.92);
+    /* do NOT use isolation:isolate here — it disables backdrop-filter frost */
     box-shadow:
-      0 10px 36px rgba(0, 0, 0, 0.4),
-      0 2px 8px rgba(0, 0, 0, 0.25),
-      inset 0 1px 1px rgba(255, 255, 255, 0.08),
-      inset 0 -10px 18px rgba(0, 0, 0, 0.28);
+      0 12px 40px rgba(0, 0, 0, 0.45),
+      0 2px 8px rgba(0, 0, 0, 0.3);
+  }
+
+  .frost {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    /* layered frost fill so it still reads on transparent Tauri windows
+       (WebView cannot blur the desktop behind a transparent window) */
+    background:
+      linear-gradient(
+        165deg,
+        rgba(255, 255, 255, 0.1) 0%,
+        rgba(255, 255, 255, 0.02) 38%,
+        rgba(0, 0, 0, 0.2) 100%
+      ),
+      rgba(12, 10, 20, 0.62);
+    -webkit-backdrop-filter: blur(22px) saturate(180%) brightness(0.9);
+    backdrop-filter: blur(22px) saturate(180%) brightness(0.9);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.12),
+      inset 0 -12px 22px rgba(0, 0, 0, 0.35);
+  }
+
+  .grain {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: 0.4;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 120px 120px;
+  }
+
+  .capsule.error .frost {
+    background:
+      linear-gradient(
+        165deg,
+        rgba(255, 200, 200, 0.08) 0%,
+        rgba(255, 255, 255, 0.02) 38%,
+        rgba(40, 0, 0, 0.25) 100%
+      ),
+      rgba(42, 10, 16, 0.66);
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.1),
+      inset 0 -12px 22px rgba(80, 0, 0, 0.35);
   }
 
   .capsule.error .glass {
-    background: rgba(40, 8, 16, 0.58);
     box-shadow:
-      0 10px 36px rgba(127, 29, 29, 0.35),
-      0 2px 8px rgba(0, 0, 0, 0.25),
-      inset 0 1px 1px rgba(255, 255, 255, 0.08),
-      inset 0 -10px 18px rgba(0, 0, 0, 0.28);
+      0 12px 40px rgba(127, 29, 29, 0.4),
+      0 2px 8px rgba(0, 0, 0, 0.3);
   }
 
   .chrome {
+    position: relative;
+    z-index: 2;
     height: 100%;
     display: flex;
     align-items: center;

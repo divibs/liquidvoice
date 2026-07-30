@@ -102,11 +102,14 @@
     user-select: none;
   }
 
+  /* Busy colorful field so backdrop-filter frost is visible in browser preview */
   :global(html.dev body) {
     background:
-      radial-gradient(820px 460px at 68% 22%, rgba(124, 58, 237, 0.12), transparent 62%),
-      radial-gradient(640px 380px at 22% 82%, rgba(217, 70, 239, 0.06), transparent 62%),
-      linear-gradient(160deg, #0c0a14, #08060d 55%, #0a0810);
+      radial-gradient(ellipse 70% 50% at 18% 28%, #4c1d95 0%, transparent 55%),
+      radial-gradient(ellipse 60% 45% at 82% 18%, #1e3a8a 0%, transparent 50%),
+      radial-gradient(ellipse 50% 55% at 62% 88%, #9d174d 0%, transparent 50%),
+      radial-gradient(ellipse 40% 40% at 12% 82%, #0e7490 0%, transparent 45%),
+      linear-gradient(165deg, #0a0814, #07070a 55%, #0c0a14);
   }
 
   .stage {

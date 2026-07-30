@@ -44,7 +44,8 @@ When the hotkey triggers listening, show a small frosted-glass pill that morphs 
 - Replace `src/components/Capsule.svelte` (SVG goo filter approach) with CSS/HTML pill matching this spec
 - Keep props: `level`, `target`, `elapsed`, `mode`, `onCollapsed`
 - Error mode: can tint rim/glow rose; status stays red while listening
-- Overlay window stays transparent/click-through; glass samples desktop via WebView backdrop-filter — verify on Windows WebView2
+- Overlay window is transparent; WebView **cannot** blur the desktop (`backdrop-filter` only sees in-page pixels). Capsule uses layered tint + film grain so frost still reads; `backdrop-filter` helps in `npm run dev` over colorful stage.
+- Never use `isolation: isolate` on the frost surface (disables blur).
 - Dev preview (`npm run dev`) should still auto-play morph with fake mic
 
 ## Out of scope
