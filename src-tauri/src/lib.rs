@@ -150,6 +150,7 @@ fn start_listening(handle: &tauri::AppHandle) {
             drop(recorder);
             drop(state);
             if let Some(overlay) = handle.get_webview_window("overlay") {
+                let _ = overlay.set_ignore_cursor_events(true);
                 let _ = overlay.show();
                 let _ = overlay.emit("state", "listening");
             }
@@ -158,6 +159,7 @@ fn start_listening(handle: &tauri::AppHandle) {
             drop(recorder);
             drop(state);
             if let Some(overlay) = handle.get_webview_window("overlay") {
+                let _ = overlay.set_ignore_cursor_events(true);
                 let _ = overlay.show();
                 let _ = overlay.emit("state", "error");
                 let _ = overlay.emit("error-msg", e);
@@ -178,6 +180,7 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
     if pcm.len() < 8000 {
         if let Some(overlay) = handle.get_webview_window("overlay") {
             let _ = overlay.emit("state", "done");
+            let _ = overlay.hide();
         }
         return;
     }
@@ -220,12 +223,26 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
                 if let Some(overlay) = h.get_webview_window("overlay") {
                     let _ = overlay.emit("state", "done");
                 }
+                let h2 = h.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
+                    if let Some(overlay) = h2.get_webview_window("overlay") {
+                        let _ = overlay.hide();
+                    }
+                });
             }
             Err(e) => {
                 if let Some(overlay) = h.get_webview_window("overlay") {
                     let _ = overlay.emit("state", "error");
                     let _ = overlay.emit("error-msg", e);
                 }
+                let h2 = h.clone();
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+                    if let Some(overlay) = h2.get_webview_window("overlay") {
+                        let _ = overlay.hide();
+                    }
+                });
             }
         }
     });
