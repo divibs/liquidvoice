@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
   import { onMount } from 'svelte';
   import '@fontsource-variable/space-grotesk';
 
@@ -12,6 +13,7 @@
   let language = $state('');
   let prompt = $state('');
   let wallpaper = $state<Wallpaper>('blueprint');
+  let launchAtLogin = $state(false);
   let saved = $state(false);
 
   function normalizeTheme(t: string): Wallpaper {
@@ -29,6 +31,11 @@
     language = cfg.language;
     prompt = cfg.prompt;
     wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
+    try {
+      launchAtLogin = await isEnabled();
+    } catch {
+      launchAtLogin = false;
+    }
   });
 
   async function save() {
@@ -44,6 +51,12 @@
         max_recording_sec: 60,
       },
     });
+    try {
+      if (launchAtLogin) await enable();
+      else await disable();
+    } catch (e) {
+      console.error('autostart update failed', e);
+    }
     saved = true;
     setTimeout(() => (saved = false), 1500);
   }
@@ -109,6 +122,26 @@
                 onclick={() => (triggerMode = 'toggle')}
               >
                 Toggle
+              </button>
+            </div>
+          </div>
+
+          <div class="field">
+            <span class="label">Launch at login</span>
+            <div class="segmented">
+              <button
+                type="button"
+                class:active={!launchAtLogin}
+                onclick={() => (launchAtLogin = false)}
+              >
+                Off
+              </button>
+              <button
+                type="button"
+                class:active={launchAtLogin}
+                onclick={() => (launchAtLogin = true)}
+              >
+                On
               </button>
             </div>
           </div>

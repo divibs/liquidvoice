@@ -30,6 +30,11 @@ fn save_config(state: State<AppState>, config: AppConfig) -> Result<(), String> 
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_autostart::Builder::new()
+                .app_name("LiquidVoice")
+                .build(),
+        )
         .manage(AppState {
             recorder: Mutex::new(AudioRecorder::new()),
             config: Mutex::new(config::load()),
