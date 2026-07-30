@@ -1,4 +1,4 @@
-# LiquidVoice Overlay UI — Design Spec
+# LiquidVoice Overlay UI - Design Spec
 
 **Date:** 2026-07-30  
 **Status:** Locked (user-approved) · implemented in `Capsule.svelte`  
@@ -16,7 +16,7 @@ When the hotkey triggers listening, show a small frosted-glass pill that morphs 
 | Morph | Elastic stretch, fast (~650ms open / ~380ms close), startup spring bounce |
 | Size | Short pill ~168×34 CSS px at rest |
 | Material | `backdrop-filter: blur(16px) saturate(185%) brightness(0.92)` + `rgba(6,6,12,0.45)` tint |
-| Outline | None — no border stroke |
+| Outline | None - no border stroke |
 | Top specular | None |
 | Status dot | Red (`#ef4444` family), not purple |
 | Clip | Always `border-radius: 999px`; morph via width/height (+ slight mid-stretch height squash). No peanut `%` radii |
@@ -36,7 +36,7 @@ When the hotkey triggers listening, show a small frosted-glass pill that morphs 
 
 1. **Appear:** scale spring kick (~+22% decaying underdamped), width/height expand
 2. **Stretch:** elastic width grow; slight vertical squash mid-way for liquid feel
-3. **Settle:** soft end bounce; chrome fades in ~0.38–0.72 of timeline
+3. **Settle:** soft end bounce; chrome fades in ~0.38-0.72 of timeline
 4. **Collapse:** reverse on `target=0`, then call `onCollapsed`
 
 ## Implementation notes (existing app)

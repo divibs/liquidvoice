@@ -1,4 +1,4 @@
-# LiquidVoice — Design Spec
+# LiquidVoice - Design Spec
 
 Windows system-wide STT dictation app with liquid-animated overlay, powered by OpenAI gpt-4o-transcribe.
 
@@ -47,26 +47,26 @@ IDLE ──(hotkey)──► LISTENING ──(release/toggle)──► PROCESSIN
 
 ### Key Decisions
 
-- WebView window created once at startup, toggled `visible` — no destroy/recreate flicker
+- WebView window created once at startup, toggled `visible` - no destroy/recreate flicker
 - Overlay: `transparent: true`, `decorations: false`, `always_on_top: true`, `focusable: false`
 - Audio buffer: in-memory `Vec<i16>`, no temp files
 - OpenAI call: async `reqwest`, non-blocking on Tauri's async runtime
 
 ## Rust Backend Modules
 
-### `main.rs` — App lifecycle
+### `main.rs` - App lifecycle
 - Tauri builder: tray icon, global hotkey registration, Tauri commands
 - Tray: icon in hidden area, right-click menu → "Settings" / "Quit"
 - Overlay window: created at startup, hidden, positioned top-center of primary monitor
 - Hotkey events → state machine transitions + frontend events
 
-### `hotkey.rs` — Global hotkey manager
+### `hotkey.rs` - Global hotkey manager
 - `tauri-plugin-global-shortcut` (Win32 `RegisterHotKey`)
 - Default: `Ctrl+Space`, stored in config, re-registered on change
 - Push-to-talk: keydown starts recording, keyup stops
 - Toggle: single press flips between LISTENING and PROCESSING
 
-### `audio.rs` — Mic capture
+### `audio.rs` - Mic capture
 - `cpal` crate, 16kHz mono i16 PCM
 - Opens default input device on LISTENING start
 - Streams into `Vec<i16>` buffer
@@ -74,7 +74,7 @@ IDLE ──(hotkey)──► LISTENING ──(release/toggle)──► PROCESSIN
 - On stop: close stream, return buffer
 - Hard cap: 60 seconds (~1.9MB WAV), auto-stops
 
-### `transcribe.rs` — OpenAI API
+### `transcribe.rs` - OpenAI API
 - `reqwest::Client` POST to `https://api.openai.com/v1/audio/transcriptions`
 - Multipart form fields:
   - `file`: WAV bytes (encoded from PCM buffer)
@@ -85,19 +85,19 @@ IDLE ──(hotkey)──► LISTENING ──(release/toggle)──► PROCESSIN
 - Timeout: 15 seconds
 - Returns `Result<String, TranscribeError>`
 
-### `inject.rs` — Text injection
+### `inject.rs` - Text injection
 - Win32 `SendInput` with `KEYEVENTF_UNICODE` per character
 - No clipboard
 - Batched: chunks of 64 chars with 1ms inter-chunk delay
 - Handles Unicode (emoji, CJK, accented chars)
 
-### `config.rs` — Configuration
+### `config.rs` - Configuration
 - Path: `%APPDATA%/liquidvoice/config.json`
 - Fields: `apiKey`, `model`, `hotkey`, `triggerMode`, `language`, `prompt`, `theme`, `maxRecordingSec`
 - Load on startup, save on settings change
 - API key in plaintext (v0.1); DPAPI encryption planned for v0.2
 
-## Frontend — Liquid Overlay
+## Frontend - Liquid Overlay
 
 ### Window
 - Size: 480×120px
@@ -215,4 +215,4 @@ liquidvoice/
 
 - **Rust unit tests**: WAV encoding (`audio.rs`), HTTP mock (`transcribe.rs`), char chunking (`inject.rs`)
 - **Frontend**: Manual visual verification of animations
-- **Integration**: Manual E2E — hotkey → speak → text appears in target app
+- **Integration**: Manual E2E - hotkey → speak → text appears in target app

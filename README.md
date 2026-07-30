@@ -14,10 +14,10 @@ Windows system-wide speech-to-text dictation. Hold (or toggle) a hotkey → a fr
 2. On hotkey (**Ctrl+Space** by default), shows a small **liquid-glass pill** near the top of the screen with mic level, waveform, and timer.
 3. Captures microphone audio, resamples to 16 kHz mono WAV.
 4. Sends audio to OpenAI (`gpt-4o-transcribe` or `gpt-4o-mini-transcribe`).
-5. Injects the transcript into the focused app with Win32 **`SendInput`** (Unicode keystrokes — **never the clipboard**).
+5. Injects the transcript into the focused app with Win32 **`SendInput`** (Unicode keystrokes - **never the clipboard**).
 6. Collapses the overlay and returns to idle.
 
-Silent / near-silent clips are skipped so the model doesn’t hallucinate filler like “Thank you.”
+Silent / near-silent clips are skipped so the model doesn't hallucinate filler like "Thank you."
 
 ---
 
@@ -26,13 +26,13 @@ Silent / near-silent clips are skipped so the model doesn’t hallucinate filler
 | Feature | Details |
 |--------|---------|
 | Push-to-talk or toggle | Hold to talk, or press once to start/stop |
-| Global hotkey | Configurable (default `Ctrl+Space`) |
+| Global hotkey | Configurable (default `Ctrl+Space`); rebinds on save |
 | Liquid-glass overlay | Dark frosted pill, elastic morph, red status dot |
 | Settings window | API key, model, hotkey, trigger mode, language hint, custom vocabulary, wallpaper, launch at login |
 | Wallpapers | **Blueprint**, **Signal**, **Zinc** (settings background themes) |
 | Launch at login | Optional Windows startup registration |
 | Tray menu | Settings / Quit |
-| Privacy of install | Config is per Windows user under `%APPDATA%` — not baked into the installer |
+| Privacy of install | Config is per Windows user under `%APPDATA%` - not baked into the installer |
 
 ---
 
@@ -78,7 +78,7 @@ Stored at:
 
 Keys: `api_key`, `model`, `hotkey`, `trigger_mode`, `language`, `prompt`, `theme`, `max_recording_sec`.
 
-Your API key stays on that PC’s user profile. Installing the same `.exe` on another machine does **not** copy your settings.
+Your API key stays on that PC's user profile. Installing the same `.exe` on another machine does **not** copy your settings.
 
 ---
 
@@ -93,11 +93,11 @@ Hotkey → LISTENING (overlay + mic)
 
 | Layer | Tech |
 |-------|------|
-| Shell | [Tauri 2](https://tauri.app/) (Rust) — tray, global hotkey, transparent windows |
+| Shell | [Tauri 2](https://tauri.app/) (Rust): tray, global hotkey, transparent windows |
 | UI | SvelteKit 2 + Svelte 5 + Vite (static adapter) |
-| Audio | `cpal` (device default rate) → mono mix → resample to 16 kHz → `hound` WAV |
+| Audio | `cpal` (device default rate, i16/f32/u16) → mono mix → resample to 16 kHz → `hound` WAV |
 | API | `reqwest` multipart POST to OpenAI transcriptions (15 s timeout) |
-| Injection | `windows` crate, `SendInput` + `KEYEVENTF_UNICODE`, 64-char chunks |
+| Injection | `windows` crate, `SendInput` + `KEYEVENTF_UNICODE`, 64-unit UTF-16 chunks |
 | Autostart | `tauri-plugin-autostart` |
 | Font | `@fontsource-variable/space-grotesk` (bundled, not CDN) |
 
@@ -117,7 +117,7 @@ Contributor / agent notes: see [AGENTS.md](./AGENTS.md).
 - On Windows: Visual Studio Build Tools with **Desktop development with C++**
 - WebView2 (usually already installed on Win10/11)
 
-> On Windows 11, **Smart App Control** can block `cargo` (os error 4551). Disable it for local builds, or use the CI installer artifact.
+> On Windows 11, **Smart App Control** can block `cargo` (os error 4551). Disable it for local builds, or use a release installer artifact.
 
 ### Commands
 
@@ -126,6 +126,7 @@ npm ci
 npm run tauri dev      # full app + hot reload
 npm run dev            # UI only at http://localhost:1420 (fake mic preview)
 npm run check          # svelte-check
+cd src-tauri && cargo test --lib
 npm run tauri build    # release + NSIS installer
 ```
 
@@ -149,4 +150,4 @@ npm run tauri build    # release + NSIS installer
 
 ## License
 
-MIT — see [LICENSE](./LICENSE) if present, or `package.json` (`"license": "MIT"`).
+MIT - see [LICENSE](./LICENSE) if present, or `package.json` (`"license": "MIT"`).

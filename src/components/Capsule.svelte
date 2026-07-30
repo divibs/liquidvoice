@@ -153,7 +153,7 @@
     border-radius: 999px;
     border: none;
     overflow: hidden;
-    /* do NOT use isolation:isolate here — it disables backdrop-filter frost */
+    /* do NOT use isolation:isolate here: it disables backdrop-filter frost */
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.45),
       0 2px 8px rgba(0, 0, 0, 0.3);

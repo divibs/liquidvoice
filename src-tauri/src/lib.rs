@@ -4,27 +4,157 @@ mod inject;
 mod transcribe;
 
 use audio::AudioRecorder;
-use config::AppConfig;
+use config::{AppConfig, TriggerMode};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State};
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Idle,
+    Listening,
+    Processing,
+}
 
 struct AppState {
     recorder: Mutex<AudioRecorder>,
     config: Mutex<AppConfig>,
-    listening: Mutex<bool>,
+    phase: Mutex<Phase>,
+    /// Bumps each time listening starts; max-duration tasks check this so a
+    /// stale timer from a prior take cannot stop a newer one.
+    listen_gen: Mutex<u64>,
+    /// Currently registered hotkey string (for unregister-before-rebind).
+    bound_hotkey: Mutex<String>,
+}
+
+fn lock<'a, T>(m: &'a Mutex<T>, label: &str) -> Result<std::sync::MutexGuard<'a, T>, String> {
+    m.lock().map_err(|_| format!("{label} lock poisoned"))
 }
 
 #[tauri::command]
-fn get_config(state: State<AppState>) -> AppConfig {
-    state.config.lock().unwrap().clone()
+fn get_config(state: State<AppState>) -> Result<AppConfig, String> {
+    Ok(lock(&state.config, "config")?.clone())
 }
 
 #[tauri::command]
-fn save_config(state: State<AppState>, config: AppConfig) -> Result<(), String> {
+fn save_config(
+    app: tauri::AppHandle,
+    state: State<AppState>,
+    config: AppConfig,
+) -> Result<(), String> {
+    let config = config.sanitize();
+    let new_hotkey = config.hotkey.clone();
+
+    {
+        let mut bound = lock(&state.bound_hotkey, "hotkey")?;
+        if *bound != new_hotkey {
+            rebind_hotkey(&app, &bound, &new_hotkey)?;
+            *bound = new_hotkey;
+        }
+    }
+
     config::save(&config)?;
-    *state.config.lock().unwrap() = config;
+    *lock(&state.config, "config")? = config;
     Ok(())
+}
+
+fn rebind_hotkey(app: &tauri::AppHandle, old: &str, new: &str) -> Result<(), String> {
+    let gs = app.global_shortcut();
+    let new_sc = new
+        .parse::<Shortcut>()
+        .map_err(|e| format!("Invalid hotkey '{new}': {e}"))?;
+
+    if !old.is_empty() {
+        if let Ok(old_sc) = old.parse::<Shortcut>() {
+            let _ = gs.unregister(old_sc);
+        }
+    }
+
+    if let Err(e) = gs.on_shortcut(new_sc, hotkey_handler(app.clone())) {
+        // Best-effort restore of the previous binding.
+        if !old.is_empty() {
+            if let Ok(old_sc) = old.parse::<Shortcut>() {
+                let _ = gs.on_shortcut(old_sc, hotkey_handler(app.clone()));
+            }
+        }
+        return Err(format!("Failed to register hotkey '{new}': {e}"));
+    }
+    Ok(())
+}
+
+fn hotkey_handler(
+    app_handle: tauri::AppHandle,
+) -> impl Fn(&tauri::AppHandle, &Shortcut, tauri_plugin_global_shortcut::ShortcutEvent) + Send + Sync + 'static
+{
+    move |_app, _shortcut, event| {
+        let handle = app_handle.clone();
+        match event.state {
+            ShortcutState::Pressed => on_hotkey_press(&handle),
+            ShortcutState::Released => on_hotkey_release(&handle),
+        }
+    }
+}
+
+fn on_hotkey_press(handle: &tauri::AppHandle) {
+    let state: State<AppState> = handle.state();
+    let mode = match lock(&state.config, "config") {
+        Ok(c) => c.trigger_mode.clone(),
+        Err(_) => return,
+    };
+
+    let mut phase = match lock(&state.phase, "phase") {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+
+    match mode {
+        TriggerMode::Toggle => match *phase {
+            Phase::Listening => {
+                *phase = Phase::Processing;
+                drop(phase);
+                stop_and_transcribe(handle);
+            }
+            Phase::Idle => {
+                // Claim Listening before drop so a rapid second press cannot double-start.
+                *phase = Phase::Listening;
+                drop(phase);
+                if !start_listening(handle) {
+                    set_phase_idle(handle);
+                }
+            }
+            Phase::Processing => {}
+        },
+        TriggerMode::PushToTalk => {
+            if *phase == Phase::Idle {
+                *phase = Phase::Listening;
+                drop(phase);
+                if !start_listening(handle) {
+                    set_phase_idle(handle);
+                }
+            }
+        }
+    }
+}
+
+fn on_hotkey_release(handle: &tauri::AppHandle) {
+    let state: State<AppState> = handle.state();
+    let mode = match lock(&state.config, "config") {
+        Ok(c) => c.trigger_mode.clone(),
+        Err(_) => return,
+    };
+    if mode != TriggerMode::PushToTalk {
+        return;
+    }
+
+    let mut phase = match lock(&state.phase, "phase") {
+        Ok(p) => p,
+        Err(_) => return,
+    };
+    if *phase == Phase::Listening {
+        *phase = Phase::Processing;
+        drop(phase);
+        stop_and_transcribe(handle);
+    }
 }
 
 pub fn run() {
@@ -38,108 +168,33 @@ pub fn run() {
         .manage(AppState {
             recorder: Mutex::new(AudioRecorder::new()),
             config: Mutex::new(config::load()),
-            listening: Mutex::new(false),
+            phase: Mutex::new(Phase::Idle),
+            listen_gen: Mutex::new(0),
+            bound_hotkey: Mutex::new(String::new()),
         })
         .invoke_handler(tauri::generate_handler![get_config, save_config])
         .setup(|app| {
-            let tray = tauri::tray::TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
-                .tooltip("LiquidVoice")
-                .menu(
-                    &tauri::menu::MenuBuilder::new(app)
-                        .item(&tauri::menu::MenuItem::with_id(
-                            app,
-                            "settings",
-                            "Settings",
-                            true,
-                            None::<&str>,
-                        )?)
-                        .separator()
-                        .item(&tauri::menu::MenuItem::with_id(
-                            app,
-                            "quit",
-                            "Quit",
-                            true,
-                            None::<&str>,
-                        )?)
-                        .build()?,
-                )
-                .on_menu_event(|app, event| match event.id().as_ref() {
-                    "settings" => {
-                        if let Some(win) = app.get_webview_window("settings") {
-                            let _ = win.show();
-                            let _ = win.set_focus();
-                        }
-                    }
-                    "quit" => app.exit(0),
-                    _ => {}
-                })
-                .build(app)?;
-            let _ = tray;
-
-            if let Some(overlay) = app.get_webview_window("overlay") {
-                if let Ok(Some(monitor)) = overlay.primary_monitor() {
-                    let origin = monitor.position();
-                    let screen_w = monitor.size().width as i32;
-                    let scale = monitor.scale_factor();
-                    let win_w = (460.0 * scale) as i32;
-                    // Flush near the physical top edge of the primary display.
-                    let _ = overlay.set_position(tauri::Position::Physical(
-                        tauri::PhysicalPosition {
-                            x: origin.x + (screen_w - win_w) / 2,
-                            y: origin.y + (4.0 * scale) as i32,
-                        },
-                    ));
-                }
-            }
+            build_tray(app)?;
+            position_overlay(app);
 
             let state: State<AppState> = app.state();
-            let hotkey = state.config.lock().unwrap().hotkey.clone();
+            let hotkey = state
+                .config
+                .lock()
+                .expect("config")
+                .hotkey
+                .clone();
             drop(state);
 
-            let app_handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(
-                hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>().unwrap(),
-                move |_app, _shortcut, event| {
-                    let handle = app_handle.clone();
-                    match event.state {
-                        ShortcutState::Pressed => {
-                            let state: State<AppState> = handle.state();
-                            let mode = state.config.lock().unwrap().trigger_mode.clone();
-
-                            if mode == config::TriggerMode::Toggle {
-                                let mut listening = state.listening.lock().unwrap();
-                                if *listening {
-                                    *listening = false;
-                                    drop(listening);
-                                    stop_and_transcribe(&handle);
-                                } else {
-                                    *listening = true;
-                                    drop(listening);
-                                    start_listening(&handle);
-                                }
-                            } else {
-                                *state.listening.lock().unwrap() = true;
-                                drop(state);
-                                start_listening(&handle);
-                            }
-                        }
-                        ShortcutState::Released => {
-                            let state: State<AppState> = handle.state();
-                            let mode = state.config.lock().unwrap().trigger_mode.clone();
-                            let is_listening = *state.listening.lock().unwrap();
-                            drop(state);
-
-                            if mode == config::TriggerMode::PushToTalk && is_listening {
-                                let state: State<AppState> = handle.state();
-                                *state.listening.lock().unwrap() = false;
-                                drop(state);
-                                stop_and_transcribe(&handle);
-                            }
-                        }
-                    }
-                },
-            )?;
+            let shortcut = hotkey
+                .parse::<Shortcut>()
+                .unwrap_or_else(|_| "Ctrl+Space".parse().expect("default hotkey"));
+            app.global_shortcut()
+                .on_shortcut(shortcut, hotkey_handler(app.handle().clone()))?;
+            *app.state::<AppState>()
+                .bound_hotkey
+                .lock()
+                .expect("bound_hotkey") = hotkey;
 
             Ok(())
         })
@@ -147,9 +202,123 @@ pub fn run() {
         .expect("error while running LiquidVoice");
 }
 
-fn start_listening(handle: &tauri::AppHandle) {
+fn build_tray(app: &tauri::App) -> tauri::Result<()> {
+    let icon = app
+        .default_window_icon()
+        .cloned()
+        .ok_or_else(|| tauri::Error::WindowNotFound)?;
+
+    let _tray = tauri::tray::TrayIconBuilder::new()
+        .icon(icon)
+        .tooltip("LiquidVoice")
+        .menu(
+            &tauri::menu::MenuBuilder::new(app)
+                .item(&tauri::menu::MenuItem::with_id(
+                    app,
+                    "settings",
+                    "Settings",
+                    true,
+                    None::<&str>,
+                )?)
+                .separator()
+                .item(&tauri::menu::MenuItem::with_id(
+                    app,
+                    "quit",
+                    "Quit",
+                    true,
+                    None::<&str>,
+                )?)
+                .build()?,
+        )
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "settings" => {
+                if let Some(win) = app.get_webview_window("settings") {
+                    let _ = win.show();
+                    let _ = win.set_focus();
+                }
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .build(app)?;
+    Ok(())
+}
+
+fn position_overlay(app: &tauri::App) {
+    let Some(overlay) = app.get_webview_window("overlay") else {
+        return;
+    };
+    let Ok(Some(monitor)) = overlay.primary_monitor() else {
+        return;
+    };
+    let origin = monitor.position();
+    let screen_w = monitor.size().width as i32;
+    let scale = monitor.scale_factor();
+    let win_w = (460.0 * scale) as i32;
+    // Flush near the physical top edge of the primary display.
+    let _ = overlay.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+        x: origin.x + (screen_w - win_w) / 2,
+        y: origin.y + (4.0 * scale) as i32,
+    }));
+}
+
+fn emit_overlay(handle: &tauri::AppHandle, state: &str) {
+    if let Some(overlay) = handle.get_webview_window("overlay") {
+        let _ = overlay.set_ignore_cursor_events(true);
+        let _ = overlay.show();
+        let _ = overlay.emit("state", state);
+    }
+}
+
+fn emit_error(handle: &tauri::AppHandle, msg: impl AsRef<str>) {
+    if let Some(overlay) = handle.get_webview_window("overlay") {
+        let _ = overlay.set_ignore_cursor_events(true);
+        let _ = overlay.show();
+        let _ = overlay.emit("state", "error");
+        let _ = overlay.emit("error-msg", msg.as_ref());
+    }
+    // Return to Idle so the next hotkey press works after the UI collapses.
+    if let Ok(mut phase) = lock(&handle.state::<AppState>().phase, "phase") {
+        *phase = Phase::Idle;
+    }
+}
+
+fn hide_overlay_later(handle: tauri::AppHandle, ms: u64) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+        if let Some(overlay) = handle.get_webview_window("overlay") {
+            let _ = overlay.hide();
+        }
+    });
+}
+
+fn start_listening(handle: &tauri::AppHandle) -> bool {
     let state: State<AppState> = handle.state();
-    let mut recorder = state.recorder.lock().unwrap();
+    let max_sec = state
+        .config
+        .lock()
+        .map(|c| c.max_recording_sec)
+        .unwrap_or(60);
+
+    let gen = {
+        let mut g = match lock(&state.listen_gen, "listen_gen") {
+            Ok(g) => g,
+            Err(e) => {
+                emit_error(handle, e);
+                return false;
+            }
+        };
+        *g = g.wrapping_add(1);
+        *g
+    };
+
+    let mut recorder = match lock(&state.recorder, "recorder") {
+        Ok(r) => r,
+        Err(e) => {
+            emit_error(handle, e);
+            return false;
+        }
+    };
 
     let h = handle.clone();
     match recorder.start(move |level| {
@@ -158,63 +327,88 @@ fn start_listening(handle: &tauri::AppHandle) {
         Ok(()) => {
             drop(recorder);
             drop(state);
-            if let Some(overlay) = handle.get_webview_window("overlay") {
-                let _ = overlay.set_ignore_cursor_events(true);
-                let _ = overlay.show();
-                let _ = overlay.emit("state", "listening");
-            }
+            emit_overlay(handle, "listening");
+
+            // Auto-stop when max recording length is hit (generation-guarded).
+            let h2 = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(max_sec as u64)).await;
+                let state: State<AppState> = h2.state();
+                let current = match lock(&state.listen_gen, "listen_gen") {
+                    Ok(g) => *g,
+                    Err(_) => return,
+                };
+                if current != gen {
+                    return;
+                }
+                let mut phase = match lock(&state.phase, "phase") {
+                    Ok(p) => p,
+                    Err(_) => return,
+                };
+                if *phase == Phase::Listening {
+                    *phase = Phase::Processing;
+                    drop(phase);
+                    drop(state);
+                    stop_and_transcribe(&h2);
+                }
+            });
+            true
         }
         Err(e) => {
             drop(recorder);
             drop(state);
-            if let Some(overlay) = handle.get_webview_window("overlay") {
-                let _ = overlay.set_ignore_cursor_events(true);
-                let _ = overlay.show();
-                let _ = overlay.emit("state", "error");
-                let _ = overlay.emit("error-msg", e);
-            }
+            emit_error(handle, e);
+            false
         }
     }
 }
 
 fn stop_and_transcribe(handle: &tauri::AppHandle) {
     let state: State<AppState> = handle.state();
-    let pcm = state.recorder.lock().unwrap().stop();
+    let max_sec = state
+        .config
+        .lock()
+        .map(|c| c.max_recording_sec)
+        .unwrap_or(60);
+    let pcm = match lock(&state.recorder, "recorder") {
+        Ok(mut r) => r.stop(Some(max_sec)),
+        Err(_) => {
+            if let Ok(mut p) = lock(&state.phase, "phase") {
+                *p = Phase::Idle;
+            }
+            return;
+        }
+    };
     drop(state);
 
     if let Some(overlay) = handle.get_webview_window("overlay") {
         let _ = overlay.emit("state", "processing");
     }
 
-    // Skip API when recording is too short or effectively silent — Whisper/gpt-4o-transcribe
-    // often hallucinates filler ("Thank you.", subtitles, etc.) on quiet audio.
+    // Skip API when recording is too short or effectively silent.
+    // Whisper/gpt-4o-transcribe often invents filler on quiet audio.
     if pcm.len() < 1600 || !audio::has_audible_speech(&pcm, 16000) {
-        if let Some(overlay) = handle.get_webview_window("overlay") {
-            let _ = overlay.emit("state", "done");
-            let _ = overlay.hide();
-        }
+        finish_idle(handle, true);
         return;
     }
 
-    let state: State<AppState> = handle.state();
-    let cfg = state.config.lock().unwrap().clone();
-    drop(state);
+    let cfg = match lock(&handle.state::<AppState>().config, "config") {
+        Ok(c) => c.clone(),
+        Err(e) => {
+            emit_error(handle, e);
+            return;
+        }
+    };
 
     if cfg.api_key.is_empty() {
-        if let Some(overlay) = handle.get_webview_window("overlay") {
-            let _ = overlay.emit("state", "error");
-            let _ = overlay.emit("error-msg", "Set API key in settings");
-        }
+        emit_error(handle, "Set API key in settings");
         return;
     }
 
     let wav = match audio::pcm_to_wav(&pcm, 16000) {
         Ok(w) => w,
         Err(e) => {
-            if let Some(overlay) = handle.get_webview_window("overlay") {
-                let _ = overlay.emit("state", "error");
-                let _ = overlay.emit("error-msg", e);
-            }
+            emit_error(handle, e);
             return;
         }
     };
@@ -227,35 +421,37 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
 
         match result {
             Ok(text) => {
-                let text = text.trim().to_string();
-                // Drop empty / common silence-hallucination phrases.
                 if !text.is_empty() && !audio::is_likely_hallucination(&text) {
-                    let _ = inject::type_text(&text);
+                    if let Err(e) = inject::type_text(&text) {
+                        eprintln!("inject failed: {e}");
+                    }
                 }
                 if let Some(overlay) = h.get_webview_window("overlay") {
                     let _ = overlay.emit("state", "done");
                 }
-                let h2 = h.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-                    if let Some(overlay) = h2.get_webview_window("overlay") {
-                        let _ = overlay.hide();
-                    }
-                });
+                hide_overlay_later(h.clone(), 700);
+                set_phase_idle(&h);
             }
             Err(e) => {
-                if let Some(overlay) = h.get_webview_window("overlay") {
-                    let _ = overlay.emit("state", "error");
-                    let _ = overlay.emit("error-msg", e);
-                }
-                let h2 = h.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
-                    if let Some(overlay) = h2.get_webview_window("overlay") {
-                        let _ = overlay.hide();
-                    }
-                });
+                emit_error(&h, e);
+                hide_overlay_later(h, 5000);
             }
         }
     });
+}
+
+fn finish_idle(handle: &tauri::AppHandle, hide_now: bool) {
+    if let Some(overlay) = handle.get_webview_window("overlay") {
+        let _ = overlay.emit("state", "done");
+        if hide_now {
+            let _ = overlay.hide();
+        }
+    }
+    set_phase_idle(handle);
+}
+
+fn set_phase_idle(handle: &tauri::AppHandle) {
+    if let Ok(mut phase) = lock(&handle.state::<AppState>().phase, "phase") {
+        *phase = Phase::Idle;
+    }
 }

@@ -5,32 +5,54 @@
   import '@fontsource-variable/space-grotesk';
 
   type Wallpaper = 'blueprint' | 'signal' | 'zinc';
+  type TriggerMode = 'push-to-talk' | 'toggle';
+
+  interface AppConfig {
+    api_key: string;
+    model: string;
+    hotkey: string;
+    trigger_mode: TriggerMode;
+    language: string;
+    prompt: string;
+    theme: string;
+    max_recording_sec: number;
+  }
 
   let apiKey = $state('');
   let model = $state('gpt-4o-transcribe');
   let hotkey = $state('Ctrl+Space');
-  let triggerMode = $state('push-to-talk');
+  let triggerMode = $state<TriggerMode>('push-to-talk');
   let language = $state('');
   let prompt = $state('');
   let wallpaper = $state<Wallpaper>('blueprint');
   let launchAtLogin = $state(false);
   let saved = $state(false);
+  let saveError = $state('');
+  let saving = $state(false);
 
   function normalizeTheme(t: string): Wallpaper {
     if (t === 'signal' || t === 'zinc' || t === 'blueprint') return t;
     return 'blueprint';
   }
 
+  function normalizeTrigger(t: string): TriggerMode {
+    return t === 'toggle' ? 'toggle' : 'push-to-talk';
+  }
+
   onMount(async () => {
     document.documentElement.classList.add('settings-page');
-    const cfg = await invoke<any>('get_config');
-    apiKey = cfg.api_key;
-    model = cfg.model;
-    hotkey = cfg.hotkey;
-    triggerMode = cfg.trigger_mode;
-    language = cfg.language;
-    prompt = cfg.prompt;
-    wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
+    try {
+      const cfg = await invoke<AppConfig>('get_config');
+      apiKey = cfg.api_key ?? '';
+      model = cfg.model || 'gpt-4o-transcribe';
+      hotkey = cfg.hotkey || 'Ctrl+Space';
+      triggerMode = normalizeTrigger(cfg.trigger_mode);
+      language = cfg.language ?? '';
+      prompt = cfg.prompt ?? '';
+      wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
+    } catch (e) {
+      saveError = String(e);
+    }
     try {
       launchAtLogin = await isEnabled();
     } catch {
@@ -39,26 +61,36 @@
   });
 
   async function save() {
-    await invoke('save_config', {
-      config: {
-        api_key: apiKey,
-        model,
-        hotkey,
-        trigger_mode: triggerMode,
-        language,
-        prompt,
-        theme: wallpaper,
-        max_recording_sec: 60,
-      },
-    });
+    if (saving) return;
+    saving = true;
+    saveError = '';
     try {
-      if (launchAtLogin) await enable();
-      else await disable();
+      await invoke('save_config', {
+        config: {
+          api_key: apiKey.trim(),
+          model,
+          hotkey: hotkey.trim() || 'Ctrl+Space',
+          trigger_mode: triggerMode,
+          language: language.trim(),
+          prompt: prompt.trim(),
+          theme: wallpaper,
+          max_recording_sec: 60,
+        } satisfies AppConfig,
+      });
+      try {
+        if (launchAtLogin) await enable();
+        else await disable();
+      } catch (e) {
+        console.error('autostart update failed', e);
+        saveError = 'Saved, but launch-at-login failed';
+      }
+      saved = true;
+      setTimeout(() => (saved = false), 1500);
     } catch (e) {
-      console.error('autostart update failed', e);
+      saveError = String(e);
+    } finally {
+      saving = false;
     }
-    saved = true;
-    setTimeout(() => (saved = false), 1500);
   }
 </script>
 
@@ -84,7 +116,7 @@
         <div class="panel-body">
           <label class="field">
             <span class="label">OpenAI API Key</span>
-            <input type="password" bind:value={apiKey} placeholder="sk-..." />
+            <input type="password" bind:value={apiKey} placeholder="sk-..." autocomplete="off" />
           </label>
 
           <label class="field">
@@ -103,7 +135,7 @@
         <div class="panel-body">
           <label class="field">
             <span class="label">Hotkey</span>
-            <input bind:value={hotkey} placeholder="Ctrl+Space" />
+            <input bind:value={hotkey} placeholder="Ctrl+Space" spellcheck="false" />
           </label>
 
           <div class="field">
@@ -154,7 +186,7 @@
         <div class="panel-body">
           <label class="field">
             <span class="label">Language hint <em>optional</em></span>
-            <input bind:value={language} placeholder="en" />
+            <input bind:value={language} placeholder="en" spellcheck="false" />
           </label>
 
           <label class="field">
@@ -207,8 +239,12 @@
       </section>
     </div>
 
-    <button type="button" class="save" onclick={save} class:saved>
-      {saved ? 'Saved' : 'Save changes'}
+    {#if saveError}
+      <p class="err" role="alert">{saveError}</p>
+    {/if}
+
+    <button type="button" class="save" onclick={save} class:saved disabled={saving}>
+      {saved ? 'Saved' : saving ? 'Saving…' : 'Save changes'}
     </button>
   </div>
 </div>
@@ -244,7 +280,7 @@
     inset: 0;
   }
 
-  /* 1 · Blueprint — engineering grid, ink + cyan hairlines */
+  /* 1 · Blueprint: engineering grid, ink + cyan hairlines */
   .shell[data-wall='blueprint'] .wall-layer {
     background-color: #071018;
     background-image:
@@ -273,7 +309,7 @@
       linear-gradient(0deg, rgba(7, 16, 24, 0.9) 0%, transparent 22%, transparent 78%, rgba(7, 16, 24, 0.55) 100%);
   }
 
-  /* 2 · Signal — CRT raster / scan, no glow blobs */
+  /* 2 · Signal: CRT raster / scan, no glow blobs */
   .shell[data-wall='signal'] .wall-layer {
     background-color: #050805;
     background-image: repeating-linear-gradient(
@@ -308,7 +344,7 @@
     );
   }
 
-  /* 3 · Zinc — hard industrial bands, metal gray */
+  /* 3 · Zinc: hard industrial bands, metal gray */
   .shell[data-wall='zinc'] .wall-layer {
     background-color: #121417;
     background-image: repeating-linear-gradient(
@@ -625,6 +661,17 @@
     );
   }
 
+  .err {
+    margin: 0;
+    flex: 0 0 auto;
+    font-size: 11px;
+    color: #fda4af;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .save {
     flex: 0 0 auto;
     padding: 9px;
@@ -652,8 +699,13 @@
       inset 0 -8px 16px rgba(0, 0, 0, 0.28);
   }
 
-  .save:hover {
+  .save:hover:not(:disabled) {
     filter: brightness(1.08);
+  }
+
+  .save:disabled {
+    opacity: 0.7;
+    cursor: default;
   }
 
   .save.saved {

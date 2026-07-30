@@ -82,6 +82,8 @@
   function collapsed() {
     visible = false;
     mode = 'listen';
+    errorMsg = '';
+    level = 0;
   }
 </script>
 
