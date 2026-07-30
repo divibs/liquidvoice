@@ -38,6 +38,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![get_config, save_config])
         .setup(|app| {
             let tray = tauri::tray::TrayIconBuilder::new()
+                .icon(app.default_window_icon().unwrap().clone())
+                .tooltip("LiquidVoice")
                 .menu(
                     &tauri::menu::MenuBuilder::new(app)
                         .item(&tauri::menu::MenuItem::with_id(
@@ -73,12 +75,14 @@ pub fn run() {
             if let Some(overlay) = app.get_webview_window("overlay") {
                 if let Ok(Some(monitor)) = overlay.primary_monitor() {
                     let screen_w = monitor.size().width as i32;
+                    let screen_h = monitor.size().height as i32;
                     let scale = monitor.scale_factor();
                     let win_w = (320.0 * scale) as i32;
+                    let win_h = (90.0 * scale) as i32;
                     let _ = overlay.set_position(tauri::Position::Physical(
                         tauri::PhysicalPosition {
                             x: (screen_w - win_w) / 2,
-                            y: (24.0 * scale) as i32,
+                            y: screen_h - win_h - (100.0 * scale) as i32,
                         },
                     ));
                 }
