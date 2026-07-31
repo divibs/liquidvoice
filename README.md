@@ -1,153 +1,58 @@
 # LiquidVoice
 
-Windows system-wide speech-to-text dictation. Hold (or toggle) a hotkey → a frosted liquid-glass overlay appears → your mic audio is transcribed with OpenAI → text is typed at the cursor. Lives in the system tray.
+Minimal Windows SST. Hold a hotkey, speak, and the text is typed at the cursor.
+
+Runs in the system tray. Works in any app with a text field.
 
 **Platform:** Windows 10 / 11  
 **Version:** 0.1.0  
-**Repo:** [github.com/divibs/liquidvoice](https://github.com/divibs/liquidvoice)
+**Typical background use:** ~160 MB RAM, ~1% CPU
 
 ---
 
-## What it does
+## Install
 
-1. Runs quietly in the **system tray** (including the hidden-icons area).
-2. On hotkey (**Ctrl+Space** by default), shows a small **liquid-glass pill** near the top of the screen with mic level, waveform, and timer.
-3. Captures microphone audio, resamples to 16 kHz mono WAV.
-4. Sends audio to OpenAI (`gpt-4o-transcribe` or `gpt-4o-mini-transcribe`).
-5. Injects the transcript into the focused app with Win32 **`SendInput`** (Unicode keystrokes - **never the clipboard**).
-6. Collapses the overlay and returns to idle.
+1. Download the Windows installer (link / Releases when published).
+2. Run the installer and open LiquidVoice from the system tray.
+3. Open **Settings**, choose a model, add your API key, save.
+4. Focus a text field, hold **Ctrl+Space**, speak, release.
 
-Silent / near-silent clips are skipped so the model doesn't hallucinate filler like "Thank you."
-
----
-
-## Features
-
-| Feature | Details |
-|--------|---------|
-| Push-to-talk or toggle | Hold to talk, or press once to start/stop |
-| Global hotkey | Configurable (default `Ctrl+Space`); rebinds on save |
-| Liquid-glass overlay | Dark frosted pill, elastic morph, red status dot |
-| Settings window | API key, model, hotkey, trigger mode, language hint, custom vocabulary, wallpaper, launch at login |
-| Wallpapers | **Blueprint**, **Signal**, **Zinc** (settings background themes) |
-| Launch at login | Optional Windows startup registration |
-| Tray menu | Settings / Quit |
-| Privacy of install | Config is per Windows user under `%APPDATA%` - not baked into the installer |
-
----
-
-## Install (end users)
-
-1. Build the installer on a Windows PC (see **Develop** below), or use an installer someone already built with `npm run tauri build`.
-2. Run the NSIS installer (e.g. `LiquidVoice_0.1.0_x64-setup.exe`).
-3. Open **Settings** from the tray icon.
-4. Paste your **OpenAI API key** → **Save**.
-5. Optionally set **Launch at login → On** → **Save**.
-6. Focus any text field, hold **Ctrl+Space**, speak, release.
-
-Typical footprint (measured on a real install): installer / app on the order of a few MB; idle RAM often under ~10 MB for the main process (WebView2 may appear as separate processes).
+Default hotkey: **Ctrl+Space**.
 
 ---
 
 ## Requirements
 
-- Windows 10 or 11 (WebView2 is included with modern Windows)
-- An [OpenAI API key](https://platform.openai.com/api-keys) with access to the transcription models
-- Microphone permission for the app
+- Windows 10 or 11
+- Microphone access
+- An OpenAI and/or Qwen API key, depending on the model you select
 
 ---
 
-## Settings & config
+## Settings
 
-| Setting | Purpose |
-|---------|---------|
-| OpenAI API Key | Required for transcription |
-| Model | `gpt-4o-transcribe` or `gpt-4o-mini-transcribe` |
-| Hotkey | Global shortcut string (e.g. `Ctrl+Space`) |
-| Trigger mode | Hold to talk / Toggle |
-| Language hint | Optional (e.g. `en`) |
-| Custom vocabulary | Optional prompt / term hints for the API |
-| Wallpaper | Blueprint / Signal / Zinc |
-| Launch at login | Register or remove Windows autostart |
-
-Stored at:
-
-```text
-%APPDATA%\liquidvoice\config.json
-```
-
-Keys: `api_key`, `model`, `hotkey`, `trigger_mode`, `language`, `prompt`, `theme`, `max_recording_sec`.
-
-Your API key stays on that PC's user profile. Installing the same `.exe` on another machine does **not** copy your settings.
+| Setting | Notes |
+| --- | --- |
+| Model | OpenAI or Qwen transcription models |
+| API key | Separate keys can be saved per provider |
+| Hotkey | Global shortcut (default `Ctrl+Space`) |
+| Trigger mode | Hold to talk, or toggle |
+| Language hint | Optional |
+| Custom vocabulary | Optional terms to improve recognition |
+| Frost glass | Overlay frost strength (0–100) |
+| Wallpaper | Settings window theme |
+| Launch at login | Optional |
+| Max recording | Auto-stops a long take |
 
 ---
 
-## How it works (architecture)
+## Privacy
 
-```text
-Hotkey → LISTENING (overlay + mic)
-      → PROCESSING (OpenAI transcription)
-      → SendInput type-out
-      → IDLE (overlay hidden)
-```
-
-| Layer | Tech |
-|-------|------|
-| Shell | [Tauri 2](https://tauri.app/) (Rust): tray, global hotkey, transparent windows |
-| UI | SvelteKit 2 + Svelte 5 + Vite (static adapter) |
-| Audio | `cpal` (device default rate, i16/f32/u16) → mono mix → resample to 16 kHz → `hound` WAV |
-| API | `reqwest` multipart POST to OpenAI transcriptions (15 s timeout) |
-| Injection | `windows` crate, `SendInput` + `KEYEVENTF_UNICODE`, 64-unit UTF-16 chunks |
-| Autostart | `tauri-plugin-autostart` |
-| Font | `@fontsource-variable/space-grotesk` (bundled, not CDN) |
-
-Rust modules live under `src-tauri/src/`: `lib.rs`, `audio.rs`, `transcribe.rs`, `inject.rs`, `config.rs`.  
-Frontend: overlay (`src/routes/+page.svelte`), glass pill (`src/components/Capsule.svelte`), settings (`src/routes/settings/+page.svelte`).
-
-Contributor / agent notes: see [AGENTS.md](./AGENTS.md).
-
----
-
-## Develop
-
-### Prerequisites
-
-- Node.js 22+
-- Rust (stable) via [rustup](https://rustup.rs/)
-- On Windows: Visual Studio Build Tools with **Desktop development with C++**
-- WebView2 (usually already installed on Win10/11)
-
-> On Windows 11, **Smart App Control** can block `cargo` (os error 4551). Disable it for local builds, or use a release installer artifact.
-
-### Commands
-
-```bash
-npm ci
-npm run tauri dev      # full app + hot reload
-npm run dev            # UI only at http://localhost:1420 (fake mic preview)
-npm run check          # svelte-check
-cd src-tauri && cargo test --lib
-npm run tauri build    # release + NSIS installer
-```
-
-### Build output (Windows)
-
-| Artifact | Path |
-|----------|------|
-| NSIS installer | `src-tauri/target/release/bundle/nsis/*.exe` |
-| App binary | `src-tauri/target/release/liquidvoice.exe` |
-
----
-
-## Privacy & security notes
-
-- Audio is sent to OpenAI for transcription when you finish a utterance (not for silent skips).
-- Transcript text is typed into whatever app is focused; treat that as a trust boundary.
-- API key is stored in plaintext in `%APPDATA%\liquidvoice\config.json` (v0.1). Do not share that file.
-- Injection into elevated (admin) windows may fail silently due to Windows UIPI.
+- Audio is sent to the selected transcription provider only.
+- Text is inserted into the focused application.
 
 ---
 
 ## License
 
-MIT - see [LICENSE](./LICENSE) if present, or `package.json` (`"license": "MIT"`).
+MIT
