@@ -161,8 +161,8 @@ fn push_samples(
         }
         *floor = floor.clamp(0.002, 0.06);
 
-        // Stronger gate: quiet ambient stays flat; normal speech still moves bars.
-        let gated = ((rms - *floor * 3.0) / 0.28).clamp(0.0, 1.0);
+        // Mild gate: quiet ambient stays flat; speech maps up quickly.
+        let gated = ((rms - *floor * 2.2) / 0.16).clamp(0.0, 1.0);
         on_level(gated);
     }
 }

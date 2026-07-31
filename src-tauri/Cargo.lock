@@ -1925,6 +1925,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 name = "liquidvoice"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "cpal",
  "dirs 6.0.0",
  "hound",
@@ -1936,6 +1937,7 @@ dependencies = [
  "tauri-plugin-autostart",
  "tauri-plugin-global-shortcut",
  "tokio",
+ "window-vibrancy",
  "windows 0.61.3",
 ]
 

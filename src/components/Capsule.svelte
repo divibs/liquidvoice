@@ -6,14 +6,19 @@
     target = 0,
     elapsed = 0,
     mode = 'listen',
+    frostStrength = 72,
     onCollapsed = () => {},
   } = $props<{
     level: number;
     target: 0 | 1;
     elapsed: number;
     mode: 'listen' | 'process' | 'success' | 'skipped' | 'error';
+    /** 0 = clear, 100 = heavy simulated frost (no Windows acrylic). */
+    frostStrength?: number;
     onCollapsed?: () => void;
   }>();
+
+  const frost = $derived(Math.min(1, Math.max(0, frostStrength / 100)));
 
   let raw = $state(0);
   let orb = $state(0);
@@ -79,8 +84,8 @@
 
       const lv = untrack(() => level);
       const want = md === 'listen' ? lv : 0.04;
-      lvl += (want - lvl) * Math.min(1, dt * 0.012);
-      wt += dt * 0.0035;
+      lvl += (want - lvl) * Math.min(1, dt * 0.02);
+      wt += dt * 0.0045;
 
       const listenGone = md === 'listen' && tgt === 0 && raw <= 0;
       const orbGone =
@@ -146,9 +151,10 @@
   function barH(i: number) {
     const taper = Math.sin((Math.PI * i) / (N - 1));
     const wave = 0.5 + 0.5 * Math.sin(wt + i * 0.55);
-    // Dead-zone so ambient hiss stays flat; only real speech drives motion.
-    const energy = Math.max(0, (lvl - 0.04) / 0.96);
-    const motion = taper * energy * 14 * wave;
+    // Tiny dead-zone keeps silence flat; sqrt lifts normal desk speech.
+    const energy = Math.max(0, (lvl - 0.012) / 0.988);
+    const punch = Math.sqrt(energy);
+    const motion = taper * punch * 18 * wave;
     return Math.max(2, (2.2 + motion) * uiOp);
   }
 </script>
@@ -161,9 +167,12 @@
   style:--s={scale}
   style:--ui={uiOp}
   style:--uy="{uiY}px"
+  style:--f={frost}
 >
   <div class="glass">
+    <div class="mat" aria-hidden="true"></div>
     <div class="frost" aria-hidden="true"></div>
+    <div class="sheen" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
     <div class="chrome">
@@ -227,8 +236,23 @@
     border: none;
     overflow: hidden;
     box-shadow:
-      0 12px 40px rgba(0, 0, 0, 0.45),
-      0 2px 8px rgba(0, 0, 0, 0.3);
+      0 14px 42px rgba(0, 0, 0, calc(0.28 + var(--f, 0.7) * 0.35)),
+      0 2px 8px rgba(0, 0, 0, 0.35),
+      inset 0 0 0 0.5px rgba(255, 255, 255, calc(0.06 + var(--f, 0.7) * 0.14));
+  }
+
+  /* Painted frost body so the pill reads as glass without desktop acrylic. */
+  .mat {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: rgba(
+      22,
+      24,
+      34,
+      calc(0.18 + var(--f, 0.7) * 0.62)
+    );
   }
 
   .frost {
@@ -238,17 +262,37 @@
     pointer-events: none;
     background:
       linear-gradient(
-        165deg,
-        rgba(255, 255, 255, 0.1) 0%,
-        rgba(255, 255, 255, 0.02) 38%,
-        rgba(0, 0, 0, 0.2) 100%
+        155deg,
+        rgba(255, 255, 255, calc(0.04 + var(--f, 0.7) * 0.2)) 0%,
+        rgba(255, 255, 255, calc(0.01 + var(--f, 0.7) * 0.06)) 34%,
+        rgba(255, 255, 255, 0) 55%,
+        rgba(0, 0, 0, calc(0.08 + var(--f, 0.7) * 0.22)) 100%
       ),
-      rgba(12, 10, 20, 0.62);
-    -webkit-backdrop-filter: blur(22px) saturate(180%) brightness(0.9);
-    backdrop-filter: blur(22px) saturate(180%) brightness(0.9);
+      rgba(
+        160,
+        175,
+        210,
+        calc(var(--f, 0.7) * 0.1)
+      );
     box-shadow:
-      inset 0 1px 1px rgba(255, 255, 255, 0.12),
-      inset 0 -12px 22px rgba(0, 0, 0, 0.35);
+      inset 0 1px 1px rgba(255, 255, 255, calc(0.08 + var(--f, 0.7) * 0.18)),
+      inset 0 -16px 28px rgba(0, 0, 0, calc(0.18 + var(--f, 0.7) * 0.35));
+  }
+
+  .sheen {
+    position: absolute;
+    left: 8%;
+    right: 8%;
+    top: 0;
+    height: 42%;
+    border-radius: 999px;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, calc(var(--f, 0.7) * 0.22)) 0%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    opacity: calc(0.35 + var(--f, 0.7) * 0.65);
   }
 
   .grain {
@@ -256,21 +300,24 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    opacity: 0.4;
+    opacity: calc(0.15 + var(--f, 0.7) * 0.55);
     mix-blend-mode: overlay;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-    background-size: 120px 120px;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 110px 110px;
+  }
+
+  .capsule.error .mat {
+    background: rgba(48, 12, 18, calc(0.28 + var(--f, 0.7) * 0.55));
   }
 
   .capsule.error .frost {
     background:
       linear-gradient(
         165deg,
-        rgba(255, 200, 200, 0.08) 0%,
+        rgba(255, 200, 200, calc(0.06 + var(--f, 0.7) * 0.12)) 0%,
         rgba(255, 255, 255, 0.02) 38%,
         rgba(40, 0, 0, 0.25) 100%
-      ),
-      rgba(42, 10, 16, 0.66);
+      );
     box-shadow:
       inset 0 1px 1px rgba(255, 255, 255, 0.1),
       inset 0 -12px 22px rgba(80, 0, 0, 0.35);

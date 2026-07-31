@@ -12,6 +12,7 @@
   let level = $state(0);
   let elapsed = $state(0);
   let errorMsg = $state('');
+  let frostStrength = $state(72);
 
   let startTs = 0;
   let errorTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,6 +49,7 @@
         level = 0.12 + Math.abs(Math.sin(k)) * 0.4 + Math.random() * 0.06;
       }, 50);
       // Preview exit sequence after a few seconds.
+      frostStrength = 78;
       const t1 = setTimeout(() => {
         mode = 'process';
       }, 2800);
@@ -65,6 +67,10 @@
 
     listen<number>('mic-level', (e) => {
       if (mode === 'listen') level = e.payload;
+    }).then((fn) => off.push(fn));
+
+    listen<number>('frost-strength', (e) => {
+      frostStrength = Math.min(100, Math.max(0, Math.round(e.payload)));
     }).then((fn) => off.push(fn));
 
     listen<string>('state', (e) => {
@@ -126,7 +132,7 @@
 
 <div class="stage" class:visible class:shake={mode === 'error' && visible}>
   {#if visible}
-    <Capsule {level} {target} {elapsed} {mode} onCollapsed={collapsed} />
+    <Capsule {level} {target} {elapsed} {mode} {frostStrength} onCollapsed={collapsed} />
     {#if mode === 'error' && errorMsg}
       <p class="caption">{errorMsg}</p>
     {/if}

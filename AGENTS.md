@@ -43,4 +43,4 @@ Windows system-wide STT dictation. Hold/toggle a hotkey → liquid-glass overlay
 - **Style:** do not use em dashes (-) in comments, docs, or UI copy.
 
 ## Config keys
-`api_key`, `model`, `hotkey` (default `Ctrl+Space`), `trigger_mode` (`push-to-talk`|`toggle`), `language`, `prompt`, `theme`, `max_recording_sec` (clamped 5-300; auto-stops listening).
+`api_key` (legacy/active), `openai_api_key`, `qwen_api_key` (per-provider presets), `model` (default `gpt-4o-mini-transcribe`; also `gpt-4o-transcribe`, `qwen-audio-3.0-asr-flash`), `hotkey` (default `Ctrl+Space`), `trigger_mode` (`push-to-talk`|`toggle`), `language`, `prompt`, `theme`, `max_recording_sec` (clamped 5-300; auto-stops listening), `frost_strength` (0-100; CSS frosted glass on overlay).

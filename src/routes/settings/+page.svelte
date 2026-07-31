@@ -6,9 +6,12 @@
 
   type Wallpaper = 'blueprint' | 'signal' | 'zinc';
   type TriggerMode = 'push-to-talk' | 'toggle';
+  type Section = 'api' | 'dictation' | 'appearance';
 
   interface AppConfig {
     api_key: string;
+    openai_api_key: string;
+    qwen_api_key: string;
     model: string;
     hotkey: string;
     trigger_mode: TriggerMode;
@@ -16,20 +19,33 @@
     prompt: string;
     theme: string;
     max_recording_sec: number;
+    glass_blur: boolean;
+    frost_strength: number;
   }
 
-  let apiKey = $state('');
-  let model = $state('gpt-4o-transcribe');
+  let openaiKey = $state('');
+  let qwenKey = $state('');
+  let model = $state('gpt-4o-mini-transcribe');
   let hotkey = $state('Ctrl+Space');
   let triggerMode = $state<TriggerMode>('push-to-talk');
   let language = $state('');
   let prompt = $state('');
   let wallpaper = $state<Wallpaper>('blueprint');
   let maxRecordingSec = $state(60);
+  let frostStrength = $state(72);
   let launchAtLogin = $state(false);
+  let openSection = $state<Section>('api');
   let saved = $state(false);
   let saveError = $state('');
   let saving = $state(false);
+
+  const isQwen = $derived(model === 'qwen-audio-3.0-asr-flash');
+  const keyLabel = $derived(isQwen ? 'Qwen / DashScope API Key' : 'OpenAI API Key');
+  const keyHint = $derived(
+    isQwen
+      ? 'Saved separately from OpenAI. Switch models without re-pasting.'
+      : 'Saved separately from Qwen. Switch models without re-pasting.',
+  );
 
   function normalizeTheme(t: string): Wallpaper {
     if (t === 'signal' || t === 'zinc' || t === 'blueprint') return t;
@@ -40,18 +56,29 @@
     return t === 'toggle' ? 'toggle' : 'push-to-talk';
   }
 
+  function toggleSection(id: Section) {
+    openSection = id;
+  }
+
   onMount(async () => {
     document.documentElement.classList.add('settings-page');
     try {
       const cfg = await invoke<AppConfig>('get_config');
-      apiKey = cfg.api_key ?? '';
-      model = cfg.model || 'gpt-4o-transcribe';
+      openaiKey = cfg.openai_api_key || '';
+      qwenKey = cfg.qwen_api_key || '';
+      // Legacy single-key configs: put api_key into the active provider if slots empty.
+      if (!openaiKey && !qwenKey && cfg.api_key) {
+        if (cfg.model === 'qwen-audio-3.0-asr-flash') qwenKey = cfg.api_key;
+        else openaiKey = cfg.api_key;
+      }
+      model = cfg.model || 'gpt-4o-mini-transcribe';
       hotkey = cfg.hotkey || 'Ctrl+Space';
       triggerMode = normalizeTrigger(cfg.trigger_mode);
       language = cfg.language ?? '';
       prompt = cfg.prompt ?? '';
       wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
       maxRecordingSec = Math.min(300, Math.max(5, cfg.max_recording_sec || 60));
+      frostStrength = Math.min(100, Math.max(0, cfg.frost_strength ?? 72));
     } catch (e) {
       saveError = String(e);
     }
@@ -67,9 +94,14 @@
     saving = true;
     saveError = '';
     try {
+      const openai = openaiKey.trim();
+      const qwen = qwenKey.trim();
+      const active = model === 'qwen-audio-3.0-asr-flash' ? qwen : openai;
       await invoke('save_config', {
         config: {
-          api_key: apiKey.trim(),
+          api_key: active,
+          openai_api_key: openai,
+          qwen_api_key: qwen,
           model,
           hotkey: hotkey.trim() || 'Ctrl+Space',
           trigger_mode: triggerMode,
@@ -77,6 +109,8 @@
           prompt: prompt.trim(),
           theme: wallpaper,
           max_recording_sec: Math.min(300, Math.max(5, Math.round(Number(maxRecordingSec)) || 60)),
+          glass_blur: false,
+          frost_strength: Math.min(100, Math.max(0, Math.round(Number(frostStrength)) || 0)),
         } satisfies AppConfig,
       });
       try {
@@ -112,146 +146,179 @@
     </header>
 
     <div class="scroll">
-      <section class="panel">
+      <section class="panel" class:open={openSection === 'api'}>
         <div class="frost" aria-hidden="true"></div>
         <div class="grain" aria-hidden="true"></div>
-        <div class="panel-body">
-          <label class="field">
-            <span class="label">OpenAI API Key</span>
-            <input type="password" bind:value={apiKey} placeholder="sk-..." autocomplete="off" />
-          </label>
+        <button type="button" class="sect-head" onclick={() => toggleSection('api')}>
+          <span>API</span>
+          <span class="chev" aria-hidden="true"></span>
+        </button>
+        {#if openSection === 'api'}
+          <div class="panel-body">
+            <label class="field">
+              <span class="label">Model</span>
+              <select bind:value={model}>
+                <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
+                <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
+                <option value="qwen-audio-3.0-asr-flash">qwen-audio-3.0-asr-flash</option>
+              </select>
+            </label>
 
-          <label class="field">
-            <span class="label">Model</span>
-            <select bind:value={model}>
-              <option value="gpt-4o-transcribe">gpt-4o-transcribe</option>
-              <option value="gpt-4o-mini-transcribe">gpt-4o-mini-transcribe</option>
-            </select>
-          </label>
-        </div>
+            <label class="field">
+              <span class="label">{keyLabel}</span>
+              {#if isQwen}
+                <input type="password" bind:value={qwenKey} placeholder="sk-..." autocomplete="off" />
+              {:else}
+                <input type="password" bind:value={openaiKey} placeholder="sk-..." autocomplete="off" />
+              {/if}
+              <span class="hint">{keyHint}</span>
+            </label>
+          </div>
+        {/if}
       </section>
 
-      <section class="panel">
+      <section class="panel" class:open={openSection === 'dictation'}>
         <div class="frost" aria-hidden="true"></div>
         <div class="grain" aria-hidden="true"></div>
-        <div class="panel-body">
-          <label class="field">
-            <span class="label">Hotkey</span>
-            <input bind:value={hotkey} placeholder="Ctrl+Space" spellcheck="false" />
-          </label>
+        <button type="button" class="sect-head" onclick={() => toggleSection('dictation')}>
+          <span>Dictation</span>
+          <span class="chev" aria-hidden="true"></span>
+        </button>
+        {#if openSection === 'dictation'}
+          <div class="panel-body">
+            <label class="field">
+              <span class="label">Hotkey</span>
+              <input bind:value={hotkey} placeholder="Ctrl+Space" spellcheck="false" />
+            </label>
 
-          <div class="field">
-            <span class="label">Trigger Mode</span>
-            <div class="segmented">
-              <button
-                type="button"
-                class:active={triggerMode === 'push-to-talk'}
-                onclick={() => (triggerMode = 'push-to-talk')}
-              >
-                Hold to talk
-              </button>
-              <button
-                type="button"
-                class:active={triggerMode === 'toggle'}
-                onclick={() => (triggerMode = 'toggle')}
-              >
-                Toggle
-              </button>
+            <div class="field">
+              <span class="label">Trigger Mode</span>
+              <div class="segmented">
+                <button
+                  type="button"
+                  class:active={triggerMode === 'push-to-talk'}
+                  onclick={() => (triggerMode = 'push-to-talk')}
+                >
+                  Hold to talk
+                </button>
+                <button
+                  type="button"
+                  class:active={triggerMode === 'toggle'}
+                  onclick={() => (triggerMode = 'toggle')}
+                >
+                  Toggle
+                </button>
+              </div>
+            </div>
+
+            <label class="field">
+              <span class="label">Max recording <em>{maxRecordingSec}s</em></span>
+              <input
+                type="range"
+                min="5"
+                max="300"
+                step="5"
+                value={maxRecordingSec}
+                oninput={(e) => {
+                  maxRecordingSec = Number(e.currentTarget.value);
+                }}
+              />
+            </label>
+
+            <label class="field">
+              <span class="label">Language hint <em>optional</em></span>
+              <input bind:value={language} placeholder="en" spellcheck="false" />
+            </label>
+
+            <label class="field">
+              <span class="label">Custom vocabulary <em>optional</em></span>
+              <input bind:value={prompt} placeholder="Technical terms, names..." />
+            </label>
+
+            <div class="field">
+              <span class="label">Launch at login</span>
+              <div class="segmented">
+                <button
+                  type="button"
+                  class:active={!launchAtLogin}
+                  onclick={() => (launchAtLogin = false)}
+                >
+                  Off
+                </button>
+                <button
+                  type="button"
+                  class:active={launchAtLogin}
+                  onclick={() => (launchAtLogin = true)}
+                >
+                  On
+                </button>
+              </div>
             </div>
           </div>
-
-          <div class="field">
-            <span class="label">Launch at login</span>
-            <div class="segmented">
-              <button
-                type="button"
-                class:active={!launchAtLogin}
-                onclick={() => (launchAtLogin = false)}
-              >
-                Off
-              </button>
-              <button
-                type="button"
-                class:active={launchAtLogin}
-                onclick={() => (launchAtLogin = true)}
-              >
-                On
-              </button>
-            </div>
-          </div>
-
-          <label class="field">
-            <span class="label">Max recording <em>{maxRecordingSec}s</em></span>
-            <input
-              type="range"
-              min="5"
-              max="300"
-              step="5"
-              value={maxRecordingSec}
-              oninput={(e) => {
-                maxRecordingSec = Number(e.currentTarget.value);
-              }}
-            />
-          </label>
-        </div>
+        {/if}
       </section>
 
-      <section class="panel">
+      <section class="panel" class:open={openSection === 'appearance'}>
         <div class="frost" aria-hidden="true"></div>
         <div class="grain" aria-hidden="true"></div>
-        <div class="panel-body">
-          <label class="field">
-            <span class="label">Language hint <em>optional</em></span>
-            <input bind:value={language} placeholder="en" spellcheck="false" />
-          </label>
+        <button type="button" class="sect-head" onclick={() => toggleSection('appearance')}>
+          <span>Appearance</span>
+          <span class="chev" aria-hidden="true"></span>
+        </button>
+        {#if openSection === 'appearance'}
+          <div class="panel-body">
+            <label class="field">
+              <span class="label">Frost glass <em>{frostStrength}</em></span>
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="1"
+                value={frostStrength}
+                oninput={(e) => {
+                  frostStrength = Number(e.currentTarget.value);
+                }}
+              />
+              <span class="hint">0 = clear · 100 = heavy frost (CSS only, no Windows acrylic)</span>
+            </label>
 
-          <label class="field">
-            <span class="label">Custom vocabulary <em>optional</em></span>
-            <input bind:value={prompt} placeholder="Technical terms, names..." />
-          </label>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="frost" aria-hidden="true"></div>
-        <div class="grain" aria-hidden="true"></div>
-        <div class="panel-body">
-          <div class="field">
-            <span class="label">Wallpaper</span>
-            <div class="walls">
-              <button
-                type="button"
-                class="wall-pick blueprint"
-                class:active={wallpaper === 'blueprint'}
-                onclick={() => (wallpaper = 'blueprint')}
-                aria-label="Blueprint wallpaper"
-              >
-                <span class="wall-preview"></span>
-                <span class="wall-name">Blueprint</span>
-              </button>
-              <button
-                type="button"
-                class="wall-pick signal"
-                class:active={wallpaper === 'signal'}
-                onclick={() => (wallpaper = 'signal')}
-                aria-label="Signal wallpaper"
-              >
-                <span class="wall-preview"></span>
-                <span class="wall-name">Signal</span>
-              </button>
-              <button
-                type="button"
-                class="wall-pick zinc"
-                class:active={wallpaper === 'zinc'}
-                onclick={() => (wallpaper = 'zinc')}
-                aria-label="Zinc wallpaper"
-              >
-                <span class="wall-preview"></span>
-                <span class="wall-name">Zinc</span>
-              </button>
+            <div class="field">
+              <span class="label">Wallpaper</span>
+              <div class="walls">
+                <button
+                  type="button"
+                  class="wall-pick blueprint"
+                  class:active={wallpaper === 'blueprint'}
+                  onclick={() => (wallpaper = 'blueprint')}
+                  aria-label="Blueprint wallpaper"
+                >
+                  <span class="wall-preview"></span>
+                  <span class="wall-name">Blueprint</span>
+                </button>
+                <button
+                  type="button"
+                  class="wall-pick signal"
+                  class:active={wallpaper === 'signal'}
+                  onclick={() => (wallpaper = 'signal')}
+                  aria-label="Signal wallpaper"
+                >
+                  <span class="wall-preview"></span>
+                  <span class="wall-name">Signal</span>
+                </button>
+                <button
+                  type="button"
+                  class="wall-pick zinc"
+                  class:active={wallpaper === 'zinc'}
+                  onclick={() => (wallpaper = 'zinc')}
+                  aria-label="Zinc wallpaper"
+                >
+                  <span class="wall-preview"></span>
+                  <span class="wall-name">Zinc</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        {/if}
       </section>
     </div>
 
@@ -506,7 +573,44 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+    padding: 0 10px 10px;
+  }
+
+  .sect-head {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
     padding: 10px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.88);
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-align: left;
+  }
+
+  .sect-head:hover {
+    color: #fff;
+  }
+
+  .chev {
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.45);
+    border-bottom: 1.5px solid rgba(255, 255, 255, 0.45);
+    transform: rotate(-45deg);
+    transition: transform 0.15s ease;
+  }
+
+  .panel.open .chev {
+    transform: rotate(45deg);
   }
 
   .field {
@@ -530,6 +634,14 @@
     text-transform: none;
     color: rgba(255, 255, 255, 0.26);
     margin-left: 4px;
+  }
+
+  .hint {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.32);
+    letter-spacing: 0.01em;
+    text-transform: none;
+    font-weight: 400;
   }
 
   input,

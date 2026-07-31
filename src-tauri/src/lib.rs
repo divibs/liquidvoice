@@ -54,7 +54,11 @@ fn save_config(
     }
 
     config::save(&config)?;
+    let frost = config.frost_strength;
     *lock(&state.config, "config")? = config;
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        let _ = overlay.emit("frost-strength", frost);
+    }
     Ok(())
 }
 
@@ -245,17 +249,27 @@ fn build_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn position_overlay(app: &tauri::App) {
-    let Some(overlay) = app.get_webview_window("overlay") else {
-        return;
-    };
+    if let Some(overlay) = app.get_webview_window("overlay") {
+        place_overlay(&overlay);
+    }
+}
+
+const OVERLAY_SIZE: (f64, f64) = (460.0, 90.0);
+
+fn place_overlay(overlay: &tauri::WebviewWindow) {
+    let (lw, lh) = OVERLAY_SIZE;
     let Ok(Some(monitor)) = overlay.primary_monitor() else {
         return;
     };
     let origin = monitor.position();
     let screen_w = monitor.size().width as i32;
     let scale = monitor.scale_factor();
-    let win_w = (460.0 * scale) as i32;
-    // Flush near the physical top edge of the primary display.
+    let win_w = (lw * scale) as i32;
+
+    let _ = overlay.set_size(tauri::Size::Logical(tauri::LogicalSize {
+        width: lw,
+        height: lh,
+    }));
     let _ = overlay.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
         x: origin.x + (screen_w - win_w) / 2,
         y: origin.y + (4.0 * scale) as i32,
@@ -265,7 +279,16 @@ fn position_overlay(app: &tauri::App) {
 fn emit_overlay(handle: &tauri::AppHandle, state: &str) {
     if let Some(overlay) = handle.get_webview_window("overlay") {
         let _ = overlay.set_ignore_cursor_events(true);
+        place_overlay(&overlay);
+        clear_overlay_blur(&overlay);
         let _ = overlay.show();
+        let frost = handle
+            .state::<AppState>()
+            .config
+            .lock()
+            .map(|c| c.frost_strength)
+            .unwrap_or(72);
+        let _ = overlay.emit("frost-strength", frost);
         let _ = overlay.emit("state", state);
     }
 }
@@ -273,6 +296,8 @@ fn emit_overlay(handle: &tauri::AppHandle, state: &str) {
 fn emit_error(handle: &tauri::AppHandle, msg: impl AsRef<str>) {
     if let Some(overlay) = handle.get_webview_window("overlay") {
         let _ = overlay.set_ignore_cursor_events(true);
+        place_overlay(&overlay);
+        clear_overlay_blur(&overlay);
         let _ = overlay.show();
         let _ = overlay.emit("state", "error");
         let _ = overlay.emit("error-msg", msg.as_ref());
@@ -287,9 +312,21 @@ fn hide_overlay_later(handle: tauri::AppHandle, ms: u64) {
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
         if let Some(overlay) = handle.get_webview_window("overlay") {
+            clear_overlay_blur(&overlay);
             let _ = overlay.hide();
         }
     });
+}
+
+fn clear_overlay_blur(overlay: &tauri::WebviewWindow) {
+    #[cfg(windows)]
+    {
+        let _ = window_vibrancy::clear_acrylic(overlay);
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = overlay;
+    }
 }
 
 fn start_listening(handle: &tauri::AppHandle) -> bool {
@@ -400,8 +437,13 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
         }
     };
 
-    if cfg.api_key.is_empty() {
-        emit_error(handle, "Set API key in settings");
+    if cfg.active_api_key().is_empty() {
+        let msg = if config::is_qwen_model(&cfg.model) {
+            "Set Qwen / DashScope API key in settings"
+        } else {
+            "Set OpenAI API key in settings"
+        };
+        emit_error(handle, msg);
         return;
     }
 
@@ -414,9 +456,10 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
     };
 
     let h = handle.clone();
+    let api_key = cfg.active_api_key().to_string();
     tauri::async_runtime::spawn(async move {
         let result =
-            transcribe::transcribe(&cfg.api_key, &cfg.model, wav, &cfg.language, &cfg.prompt)
+            transcribe::transcribe(&api_key, &cfg.model, wav, &cfg.language, &cfg.prompt)
                 .await;
 
         match result {

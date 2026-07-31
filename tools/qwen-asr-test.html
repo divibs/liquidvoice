@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Qwen ASR connection test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c0e12;
+      --panel: #151922;
+      --line: #2a3140;
+      --text: #e8ecf4;
+      --muted: #8b95a8;
+      --accent: #5b8cff;
+      --ok: #3dd68c;
+      --bad: #ff6b7a;
+      --mono: ui-monospace, "Cascadia Code", Consolas, monospace;
+      --sans: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--sans);
+      background: radial-gradient(1200px 600px at 20% -10%, #1a2440, transparent), var(--bg);
+      color: var(--text);
+      padding: 28px 20px 48px;
+    }
+    main { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 1.35rem; margin: 0 0 6px; font-weight: 650; }
+    .sub { color: var(--muted); margin: 0 0 22px; font-size: 0.92rem; line-height: 1.45; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    label {
+      display: block;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    input, select, textarea, button {
+      font: inherit;
+      color: var(--text);
+    }
+    input[type="password"], input[type="text"], select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0f131a;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: #4a67a8;
+    }
+    .row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 640px) { .row { grid-template-columns: 1fr; } }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button {
+      border: 1px solid var(--line);
+      background: #1c2330;
+      padding: 9px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    button:hover { background: #242c3d; }
+    button.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: #061018;
+      font-weight: 650;
+    }
+    button.primary:hover { filter: brightness(1.06); }
+    button:disabled { opacity: 0.5; cursor: default; }
+    .hint { color: var(--muted); font-size: 0.85rem; margin-top: 8px; }
+    pre {
+      margin: 0;
+      padding: 12px;
+      border-radius: 10px;
+      background: #0a0d12;
+      border: 1px solid var(--line);
+      overflow: auto;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 360px;
+    }
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--ok); }
+    .dot.bad { background: var(--bad); }
+    .dot.run { background: #f0c14a; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Qwen ASR connection test</h1>
+    <p class="sub">
+      Talk into the mic (or pick a WAV/MP3), then POST through the local proxy to DashScope.
+      Mic capture defaults to <strong>16 kHz WAV</strong> (same as LiquidVoice). Keep endpoint on <strong>intl</strong>.
+    </p>
+
+    <section class="card">
+      <div class="row">
+        <div>
+          <label for="key">DashScope / QwenCloud API key</label>
+          <input id="key" type="password" placeholder="sk-..." autocomplete="off" />
+        </div>
+        <div>
+          <label for="model">Model id</label>
+          <select id="model">
+            <option value="qwen-audio-3.0-asr-flash" selected>qwen-audio-3.0-asr-flash</option>
+            <option value="qwen3-asr-flash">qwen3-asr-flash</option>
+          </select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <div>
+          <label for="endpoint">Endpoint</label>
+          <select id="endpoint">
+            <option value="intl" selected>dashscope-intl (Singapore)</option>
+            <option value="cn">dashscope (China)</option>
+          </select>
+        </div>
+        <div>
+          <label for="shape">Request shape</label>
+          <select id="shape">
+            <option value="input_audio" selected>QwenCloud sample (input_audio)</option>
+            <option value="audio_field">Docs shape ({ audio })</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">Key stays in this browser tab only. The local Node proxy forwards the request to avoid CORS.</p>
+    </section>
+
+    <section class="card">
+      <label>Audio</label>
+      <div class="actions">
+        <button id="recBtn" type="button">Start recording</button>
+        <button id="stopBtn" type="button" disabled>Stop</button>
+        <label style="margin:0; text-transform:none; letter-spacing:0; display:inline-flex; align-items:center; gap:8px; cursor:pointer;">
+          <span style="padding:9px 14px; border:1px solid var(--line); border-radius:999px; background:#1c2330;">Pick file</span>
+          <input id="file" type="file" accept="audio/*,.wav,.mp3,.m4a" hidden />
+        </label>
+        <button id="sampleBtn" type="button">Use sample URL</button>
+        <button id="sendBtn" class="primary" type="button" disabled>Send to Qwen</button>
+      </div>
+      <p id="audioMeta" class="hint">No audio yet. After recording, check peak level below — if it stays near 0%, the mic captured silence.</p>
+      <p id="levelMeta" class="hint"></p>
+      <audio id="player" controls style="width:100%; margin-top:10px; display:none;"></audio>
+    </section>
+
+    <section class="card">
+      <div class="status"><span id="dot" class="dot"></span><span id="statusText">Idle</span></div>
+      <label>Request (audio data truncated)</label>
+      <pre id="reqOut">-</pre>
+      <label style="margin-top:12px">Response</label>
+      <pre id="resOut">-</pre>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const keyEl = $('key');
+    const modelEl = $('model');
+    const endpointEl = $('endpoint');
+    const shapeEl = $('shape');
+    const recBtn = $('recBtn');
+    const stopBtn = $('stopBtn');
+    const sendBtn = $('sendBtn');
+    const fileEl = $('file');
+    const player = $('player');
+    const audioMeta = $('audioMeta');
+    const reqOut = $('reqOut');
+    const resOut = $('resOut');
+    const statusText = $('statusText');
+    const dot = $('dot');
+
+    let audioBlob = null;
+    let audioMime = 'audio/wav';
+    let recCtx = null;
+    let recStream = null;
+    let recProcessor = null;
+    let recSource = null;
+    let pcmChunks = [];
+    let recSampleRate = 16000;
+
+    function setStatus(kind, text) {
+      dot.className = 'dot' + (kind ? ' ' + kind : '');
+      statusText.textContent = text;
+    }
+
+    function readyToSend() {
+      sendBtn.disabled = !audioBlob;
+    }
+
+    function setAudio(blob, mime, label) {
+      audioBlob = blob;
+      audioMime = mime || blob.type || 'application/octet-stream';
+      const url = URL.createObjectURL(blob);
+      player.src = url;
+      player.style.display = 'block';
+      audioMeta.textContent = `${label} · ${(blob.size / 1024).toFixed(1)} KB · ${audioMime}`;
+      readyToSend();
+    }
+
+    /** Encode Float32 mono PCM as 16-bit WAV. */
+    function encodeWav(float32, sampleRate) {
+      const n = float32.length;
+      const buffer = new ArrayBuffer(44 + n * 2);
+      const view = new DataView(buffer);
+      const writeStr = (offset, str) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeStr(0, 'RIFF');
+      view.setUint32(4, 36 + n * 2, true);
+      writeStr(8, 'WAVE');
+      writeStr(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true);
+      view.setUint16(22, 1, true);
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeStr(36, 'data');
+      view.setUint32(40, n * 2, true);
+      let off = 44;
+      for (let i = 0; i < n; i++, off += 2) {
+        const s = Math.max(-1, Math.min(1, float32[i]));
+        view.setInt16(off, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      }
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    /** Downsample to 16 kHz mono for DashScope wav params. */
+    function downsample(float32, fromRate, toRate) {
+      if (fromRate === toRate) return float32;
+      const ratio = fromRate / toRate;
+      const outLen = Math.floor(float32.length / ratio);
+      const out = new Float32Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const pos = i * ratio;
+        const idx = Math.floor(pos);
+        const frac = pos - idx;
+        const a = float32[idx] || 0;
+        const b = float32[idx + 1] || a;
+        out[i] = a + (b - a) * frac;
+      }
+      return out;
+    }
+
+    function stopWavCapture() {
+      if (recProcessor) {
+        try { recProcessor.disconnect(); } catch {}
+        recProcessor.onaudioprocess = null;
+        recProcessor = null;
+      }
+      if (recSource) {
+        try { recSource.disconnect(); } catch {}
+        recSource = null;
+      }
+      if (recStream) {
+        recStream.getTracks().forEach((t) => t.stop());
+        recStream = null;
+      }
+      if (recCtx) {
+        recCtx.close().catch(() => {});
+        recCtx = null;
+      }
+    }
+
+    async function blobToDataUrl(blob) {
+      const buf = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = '';
+      const step = 0x8000;
+      for (let i = 0; i < bytes.length; i += step) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + step));
+      }
+      const b64 = btoa(binary);
+      const mime = audioMime.includes('wav') ? 'audio/wav'
+        : audioMime.includes('mpeg') || audioMime.includes('mp3') ? 'audio/mpeg'
+        : audioMime.includes('mp4') || audioMime.includes('m4a') ? 'audio/mp4'
+        : audioMime.includes('webm') ? 'audio/webm'
+        : 'audio/wav';
+      return `data:${mime};base64,${b64}`;
+    }
+
+    function endpointUrl() {
+      return endpointEl.value === 'cn'
+        ? 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation'
+        : 'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+    }
+
+    function buildBody(dataUrl) {
+      const model = modelEl.value;
+      if (shapeEl.value === 'audio_field') {
+        return {
+          model,
+          input: {
+            messages: [
+              { role: 'system', content: [{ text: '' }] },
+              { role: 'user', content: [{ audio: dataUrl }] },
+            ],
+          },
+          parameters: { asr_options: { enable_itn: false } },
+        };
+      }
+      // QwenCloud sample for qwen-audio-3.0-asr-flash
+      return {
+        model,
+        input: {
+          messages: [{
+            role: 'user',
+            content: [{
+              type: 'input_audio',
+              input_audio: { data: dataUrl },
+            }],
+          }],
+        },
+        parameters: {
+          format: 'wav',
+          sample_rate: '16000',
+        },
+      };
+    }
+
+    recBtn.onclick = async () => {
+      try {
+        stopWavCapture();
+        pcmChunks = [];
+        recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recCtx = new AudioContext();
+        recSampleRate = recCtx.sampleRate;
+        recSource = recCtx.createMediaStreamSource(recStream);
+        // ScriptProcessor is deprecated but widely available for a quick test page.
+        recProcessor = recCtx.createScriptProcessor(4096, 1, 1);
+        recProcessor.onaudioprocess = (e) => {
+          pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+        };
+        recSource.connect(recProcessor);
+        const mute = recCtx.createGain();
+        mute.gain.value = 0;
+        recProcessor.connect(mute);
+        mute.connect(recCtx.destination);
+        recBtn.disabled = true;
+        stopBtn.disabled = false;
+        setStatus('run', 'Recording WAV @ ' + Math.round(recSampleRate) + ' Hz…');
+      } catch (e) {
+        stopWavCapture();
+        setStatus('bad', 'Mic permission failed');
+        resOut.textContent = String(e);
+      }
+    };
+
+    stopBtn.onclick = () => {
+      const rate = recSampleRate;
+      const parts = pcmChunks;
+      stopWavCapture();
+      recBtn.disabled = false;
+      stopBtn.disabled = true;
+
+      if (!parts.length) {
+        setStatus('bad', 'No samples captured');
+        return;
+      }
+      let total = 0;
+      for (const p of parts) total += p.length;
+      const merged = new Float32Array(total);
+      let off = 0;
+      for (const p of parts) {
+        merged.set(p, off);
+        off += p.length;
+      }
+      const pcm16k = downsample(merged, rate, 16000);
+      const wav = encodeWav(pcm16k, 16000);
+      setAudio(wav, 'audio/wav', 'Recording (WAV 16 kHz)');
+      setStatus('', 'Recording stopped (WAV)');
+    };
+
+    fileEl.onchange = () => {
+      const f = fileEl.files?.[0];
+      if (!f) return;
+      setAudio(f, f.type || 'audio/wav', f.name);
+      setStatus('', 'File loaded');
+    };
+
+    sendBtn.onclick = async () => {
+      const apiKey = keyEl.value.trim();
+      if (!apiKey) {
+        setStatus('bad', 'Paste an API key first');
+        return;
+      }
+      if (!audioBlob) {
+        setStatus('bad', 'Record or pick audio first');
+        return;
+      }
+
+      setStatus('run', 'Encoding + sending…');
+      sendBtn.disabled = true;
+      try {
+        const dataUrl = await blobToDataUrl(audioBlob);
+        const body = buildBody(dataUrl);
+        const url = endpointUrl();
+
+        const preview = structuredClone(body);
+        const leaf = preview?.input?.messages?.at(-1)?.content?.[0];
+        if (leaf?.input_audio?.data) {
+          leaf.input_audio.data = leaf.input_audio.data.slice(0, 64) + `…(+${dataUrl.length - 64} chars)`;
+        } else if (leaf?.audio) {
+          leaf.audio = leaf.audio.slice(0, 64) + `…(+${dataUrl.length - 64} chars)`;
+        }
+        reqOut.textContent = `POST ${url}\nAuthorization: Bearer ***\nX-DashScope-SSE: disable\n\n` +
+          JSON.stringify(preview, null, 2);
+
+        const resp = await fetch('/proxy/qwen', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, apiKey, body }),
+        });
+        const text = await resp.text();
+        let pretty = text;
+        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch {}
+        resOut.textContent = `HTTP ${resp.status}\n\n` + pretty;
+        setStatus(resp.ok ? 'ok' : 'bad', resp.ok ? 'Success' : `Failed (${resp.status})`);
+      } catch (e) {
+        resOut.textContent = String(e);
+        setStatus('bad', 'Request failed');
+      } finally {
+        readyToSend();
+      }
+    };
+  </script>
+</body>
+</html>
