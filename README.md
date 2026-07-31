@@ -12,7 +12,7 @@ Runs in the system tray. Works in any app with a text field.
 
 ## Install
 
-1. Download the Windows installer (link / Releases when published).
+1. Download the liquidvoice installer.
 2. Run the installer and open LiquidVoice from the system tray.
 3. Open **Settings**, choose a model, add your API key, save.
 4. Focus a text field, hold **Ctrl+Space**, speak, release.
