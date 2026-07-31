@@ -25,6 +25,7 @@
   let language = $state('');
   let prompt = $state('');
   let wallpaper = $state<Wallpaper>('blueprint');
+  let maxRecordingSec = $state(60);
   let launchAtLogin = $state(false);
   let saved = $state(false);
   let saveError = $state('');
@@ -50,6 +51,7 @@
       language = cfg.language ?? '';
       prompt = cfg.prompt ?? '';
       wallpaper = normalizeTheme(cfg.theme ?? 'blueprint');
+      maxRecordingSec = Math.min(300, Math.max(5, cfg.max_recording_sec || 60));
     } catch (e) {
       saveError = String(e);
     }
@@ -74,7 +76,7 @@
           language: language.trim(),
           prompt: prompt.trim(),
           theme: wallpaper,
-          max_recording_sec: 60,
+          max_recording_sec: Math.min(300, Math.max(5, Math.round(Number(maxRecordingSec)) || 60)),
         } satisfies AppConfig,
       });
       try {
@@ -177,6 +179,20 @@
               </button>
             </div>
           </div>
+
+          <label class="field">
+            <span class="label">Max recording <em>{maxRecordingSec}s</em></span>
+            <input
+              type="range"
+              min="5"
+              max="300"
+              step="5"
+              value={maxRecordingSec}
+              oninput={(e) => {
+                maxRecordingSec = Number(e.currentTarget.value);
+              }}
+            />
+          </label>
         </div>
       </section>
 
@@ -552,6 +568,21 @@
       inset 0 1px 2px rgba(255, 255, 255, 0.08),
       inset 0 -2px 6px rgba(0, 0, 0, 0.4),
       0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+
+  input[type='range'] {
+    width: 100%;
+    padding: 6px 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    accent-color: rgba(255, 255, 255, 0.75);
+    cursor: pointer;
+  }
+
+  input[type='range']:focus {
+    background: transparent;
+    box-shadow: none;
   }
 
   input::placeholder {

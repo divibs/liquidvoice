@@ -20,11 +20,11 @@ Windows system-wide STT dictation. Hold/toggle a hotkey → liquid-glass overlay
 
 ## Frontend (`src/`)
 - `routes/+page.svelte`: overlay page; listens to Tauri events `state`, `mic-level`, `error-msg`; drives `Capsule` target 0/1. Dev-preview mode when `__TAURI_INTERNALS__` absent.
-- `components/Capsule.svelte`: the overlay pill: pure-rAF timeline (`raw` 0..1), frosted morph (dot→stretch→capsule), mic well, tapered waveform, timer, status dot.
-- `routes/settings/+page.svelte`: settings window (API key, model, hotkey, trigger mode, language, prompt, wallpaper, launch at login).
+- `components/Capsule.svelte`: the overlay pill: pure-rAF timeline (`raw` 0..1), frosted morph (dot→stretch→capsule), then exit as orb with spinner → check → shrink-to-none.
+- `routes/settings/+page.svelte`: settings window (API key, model, hotkey, trigger mode, language, prompt, wallpaper, launch at login, max recording).
 
 ## State machine
-`IDLE` (tray only) ─hotkey─▶ `LISTENING` (overlay visible, mic on) ─release/toggle─▶ `PROCESSING` (transcribe) ─▶ inject text ─▶ collapse overlay ─▶ `IDLE`. Errors shake + 5 s caption, then return to idle. Hotkeys are ignored while `PROCESSING`.
+`IDLE` (tray only) ─hotkey─▶ `LISTENING` (overlay pill) ─release/toggle─▶ `PROCESSING` (pill morphs to orb + spinner) ─▶ inject ─▶ success check on orb ─▶ shrink away ─▶ `IDLE`. Silent/skip uses orb without check. Errors shake + 5 s caption, then return to idle. Hotkeys are ignored while `PROCESSING`.
 
 ## Run / build
 - `npm run tauri dev`: full app, hot reload. Logs (Rust errors, audio, API) print to this terminal.

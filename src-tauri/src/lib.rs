@@ -421,15 +421,22 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
 
         match result {
             Ok(text) => {
+                let mut injected = false;
                 if !text.is_empty() && !audio::is_likely_hallucination(&text) {
-                    if let Err(e) = inject::type_text(&text) {
-                        eprintln!("inject failed: {e}");
+                    match inject::type_text(&text) {
+                        Ok(()) => injected = true,
+                        Err(e) => {
+                            emit_error(&h, e);
+                            hide_overlay_later(h.clone(), 5000);
+                            return;
+                        }
                     }
                 }
                 if let Some(overlay) = h.get_webview_window("overlay") {
-                    let _ = overlay.emit("state", "done");
+                    let _ = overlay.emit("state", if injected { "done" } else { "skipped" });
                 }
-                hide_overlay_later(h.clone(), 700);
+                // Enough time for orb morph + check (or skip) + shrink.
+                hide_overlay_later(h.clone(), if injected { 1600 } else { 1000 });
                 set_phase_idle(&h);
             }
             Err(e) => {
@@ -442,9 +449,10 @@ fn stop_and_transcribe(handle: &tauri::AppHandle) {
 
 fn finish_idle(handle: &tauri::AppHandle, hide_now: bool) {
     if let Some(overlay) = handle.get_webview_window("overlay") {
-        let _ = overlay.emit("state", "done");
+        // Quiet exit: orb then shrink (no success check).
+        let _ = overlay.emit("state", "skipped");
         if hide_now {
-            let _ = overlay.hide();
+            hide_overlay_later(handle.clone(), 1000);
         }
     }
     set_phase_idle(handle);

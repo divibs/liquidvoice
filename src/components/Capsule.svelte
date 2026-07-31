@@ -11,21 +11,41 @@
     level: number;
     target: 0 | 1;
     elapsed: number;
-    mode: 'listen' | 'process' | 'error';
+    mode: 'listen' | 'process' | 'success' | 'skipped' | 'error';
     onCollapsed?: () => void;
   }>();
 
-  // morph progress 0..1
   let raw = $state(0);
+  let orb = $state(0);
+  let exit = $state(1);
   let lvl = $state(0);
   let wt = $state(0);
   let collapsed = false;
+  let holdMs = 0;
 
   const OPEN = 650;
   const CLOSE = 380;
+  const TO_ORB = 320;
+  const EXIT_MS = 280;
+  const CHECK_HOLD = 450;
+  const SKIP_HOLD = 180;
   const MAX_W = 168;
   const MAX_H = 34;
+  const ORB = 22;
   const N = 10;
+
+  $effect(() => {
+    const md = mode;
+    if (md === 'listen' && target === 1) {
+      orb = 0;
+      exit = 1;
+      holdMs = 0;
+      collapsed = false;
+    }
+    if (md === 'success' || md === 'skipped') {
+      holdMs = 0;
+    }
+  });
 
   $effect(() => {
     let raf = 0;
@@ -35,19 +55,41 @@
       last = now;
 
       const tgt = untrack(() => target);
-      raw = tgt === 1 ? Math.min(1, raw + dt / OPEN) : Math.max(0, raw - dt / CLOSE);
+      const md = untrack(() => mode);
+
+      if (md === 'listen') {
+        raw = tgt === 1 ? Math.min(1, raw + dt / OPEN) : Math.max(0, raw - dt / CLOSE);
+        orb = Math.max(0, orb - dt / TO_ORB);
+        exit = 1;
+      } else if (md === 'process' || md === 'success' || md === 'skipped') {
+        raw = Math.max(raw, 0.85);
+        orb = Math.min(1, orb + dt / TO_ORB);
+        if (md === 'success' && orb >= 0.98) {
+          holdMs += dt;
+          if (holdMs >= CHECK_HOLD) exit = Math.max(0, exit - dt / EXIT_MS);
+        } else if (md === 'skipped' && orb >= 0.98) {
+          holdMs += dt;
+          if (holdMs >= SKIP_HOLD) exit = Math.max(0, exit - dt / EXIT_MS);
+        }
+      } else if (md === 'error') {
+        raw = Math.max(raw, 0.85);
+        orb = Math.max(0, orb - dt / TO_ORB);
+        exit = 1;
+      }
 
       const lv = untrack(() => level);
-      const md = untrack(() => mode);
-      const want = md === 'process' ? 0.05 : lv;
+      const want = md === 'listen' ? lv : 0.04;
       lvl += (want - lvl) * Math.min(1, dt * 0.012);
-
       wt += dt * 0.0035;
 
-      if (tgt === 0 && raw <= 0 && !collapsed) {
+      const listenGone = md === 'listen' && tgt === 0 && raw <= 0;
+      const orbGone =
+        (md === 'success' || md === 'skipped') && exit <= 0.02 && orb >= 0.9;
+
+      if ((listenGone || orbGone) && !collapsed) {
         collapsed = true;
         untrack(() => onCollapsed)();
-      } else if (tgt === 1) {
+      } else if (tgt === 1 && md === 'listen') {
         collapsed = false;
       }
 
@@ -75,21 +117,31 @@
   const settle = $derived(smooth(0.62, 1, raw));
   const pinch = $derived(Math.sin(smooth(0.08, 0.5, raw) * Math.PI));
 
-  const pillW = $derived(lerp(12, MAX_W, stretch) * appear);
-  const pillH = $derived(
+  const pillW0 = $derived(lerp(12, MAX_W, stretch) * appear);
+  const pillH0 = $derived(
     Math.max(12 * appear, lerp(12, MAX_H, refine) * appear) * (1 - pinch * 0.12),
   );
-  const uiOp = $derived(smooth(0.38, 0.72, raw));
+
+  const o = $derived(smooth(0, 1, orb));
+  const pillW = $derived(lerp(pillW0, ORB, o));
+  const pillH = $derived(lerp(pillH0, ORB, o));
+  const uiOp = $derived(smooth(0.38, 0.72, raw) * (1 - o));
   const uiY = $derived(lerp(6, 0, smooth(0.4, 0.78, raw)));
-  const scale = $derived(
-    appear * (1 + springKick(raw) * 0.22 * appear + Math.sin(settle * Math.PI) * 0.045 * (1 - settle)),
+  const openScale = $derived(
+    appear *
+      (1 +
+        springKick(raw) * 0.22 * appear +
+        Math.sin(settle * Math.PI) * 0.045 * (1 - settle)),
   );
+  const scale = $derived(Math.max(0.001, openScale * exit));
 
   const mm = $derived(String(Math.floor(elapsed / 60)).padStart(2, '0'));
   const ss = $derived(String(elapsed % 60).padStart(2, '0'));
 
   const err = $derived(mode === 'error');
   const processing = $derived(mode === 'process');
+  const success = $derived(mode === 'success');
+  const showOrbUi = $derived(o > 0.55);
 
   function barH(i: number) {
     const taper = Math.sin((Math.PI * i) / (N - 1));
@@ -108,9 +160,9 @@
   style:--uy="{uiY}px"
 >
   <div class="glass">
-    <!-- blur layer: never put isolation:isolate on the blur surface (kills frost) -->
     <div class="frost" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
+
     <div class="chrome">
       <div class="mic" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
@@ -132,6 +184,24 @@
         <span class="rec" class:busy={processing}></span>
       </div>
     </div>
+
+    {#if showOrbUi}
+      <div class="orb-ui" aria-hidden="true">
+        {#if success}
+          <svg class="check" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12.5l4.5 4.5L19 7.5"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        {:else if processing}
+          <span class="spin"></span>
+        {/if}
+      </div>
+    {/if}
   </div>
 </div>
 
@@ -153,7 +223,6 @@
     border-radius: 999px;
     border: none;
     overflow: hidden;
-    /* do NOT use isolation:isolate here: it disables backdrop-filter frost */
     box-shadow:
       0 12px 40px rgba(0, 0, 0, 0.45),
       0 2px 8px rgba(0, 0, 0, 0.3);
@@ -164,8 +233,6 @@
     inset: 0;
     border-radius: inherit;
     pointer-events: none;
-    /* layered frost fill so it still reads on transparent Tauri windows
-       (WebView cannot blur the desktop behind a transparent window) */
     background:
       linear-gradient(
         165deg,
@@ -294,6 +361,32 @@
     animation-duration: 0.7s;
   }
 
+  .orb-ui {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.95);
+    pointer-events: none;
+  }
+
+  .spin {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.22);
+    border-top-color: rgba(255, 255, 255, 0.95);
+    animation: spin 0.7s linear infinite;
+  }
+
+  .check {
+    width: 12px;
+    height: 12px;
+    color: #86efac;
+    filter: drop-shadow(0 0 6px rgba(134, 239, 172, 0.45));
+  }
+
   @keyframes pulse {
     0%,
     100% {
@@ -303,6 +396,12 @@
     50% {
       transform: scale(0.82);
       opacity: 0.7;
+    }
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
     }
   }
 </style>

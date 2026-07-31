@@ -4,7 +4,7 @@
   import Capsule from '../components/Capsule.svelte';
   import '@fontsource-variable/space-grotesk';
 
-  type Mode = 'listen' | 'process' | 'error';
+  type Mode = 'listen' | 'process' | 'success' | 'skipped' | 'error';
 
   let visible = $state(false);
   let target = $state<0 | 1>(0);
@@ -14,9 +14,16 @@
   let errorMsg = $state('');
 
   let startTs = 0;
+  let errorTimer: ReturnType<typeof setTimeout> | null = null;
   const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-  // timer ticks while listening
+  function clearErrorTimer() {
+    if (errorTimer !== null) {
+      clearTimeout(errorTimer);
+      errorTimer = null;
+    }
+  }
+
   $effect(() => {
     if (!visible || mode !== 'listen') return;
     let raf = 0;
@@ -30,7 +37,6 @@
 
   onMount(() => {
     if (!isTauri) {
-      // dev preview: play the morph + fake mic + counting timer
       document.documentElement.classList.add('dev');
       visible = true;
       target = 1;
@@ -41,7 +47,18 @@
         k += 0.08;
         level = 0.12 + Math.abs(Math.sin(k)) * 0.4 + Math.random() * 0.06;
       }, 50);
-      return () => clearInterval(id);
+      // Preview exit sequence after a few seconds.
+      const t1 = setTimeout(() => {
+        mode = 'process';
+      }, 2800);
+      const t2 = setTimeout(() => {
+        mode = 'success';
+      }, 4200);
+      return () => {
+        clearInterval(id);
+        clearTimeout(t1);
+        clearTimeout(t2);
+      };
     }
 
     const off: (() => void)[] = [];
@@ -53,6 +70,7 @@
     listen<string>('state', (e) => {
       const s = e.payload;
       if (s === 'listening') {
+        clearErrorTimer();
         errorMsg = '';
         elapsed = 0;
         level = 0;
@@ -61,14 +79,29 @@
         visible = true;
         target = 1;
       } else if (s === 'processing') {
+        clearErrorTimer();
         mode = 'process';
+        visible = true;
+        target = 1;
       } else if (s === 'done') {
-        target = 0; // collapse back to a dot, then unmount
+        clearErrorTimer();
+        mode = 'success';
+        visible = true;
+        target = 1;
+      } else if (s === 'skipped') {
+        clearErrorTimer();
+        mode = 'skipped';
+        visible = true;
+        target = 1;
       } else if (s === 'error') {
         mode = 'error';
         target = 1;
         visible = true;
-        setTimeout(() => (target = 0), 5000);
+        clearErrorTimer();
+        errorTimer = setTimeout(() => {
+          target = 0;
+          mode = 'listen';
+        }, 5000);
       }
     }).then((fn) => off.push(fn));
 
@@ -76,7 +109,10 @@
       errorMsg = e.payload;
     }).then((fn) => off.push(fn));
 
-    return () => off.forEach((fn) => fn());
+    return () => {
+      clearErrorTimer();
+      off.forEach((fn) => fn());
+    };
   });
 
   function collapsed() {
@@ -84,6 +120,7 @@
     mode = 'listen';
     errorMsg = '';
     level = 0;
+    target = 0;
   }
 </script>
 
@@ -97,6 +134,11 @@
 </div>
 
 <style>
+  :global(html),
+  :global(body) {
+    margin: 0;
+  }
+
   :global(body) {
     background: transparent;
     overflow: hidden;
@@ -104,7 +146,6 @@
     user-select: none;
   }
 
-  /* Busy colorful field so backdrop-filter frost is visible in browser preview */
   :global(html.dev body) {
     background:
       radial-gradient(ellipse 70% 50% at 18% 28%, #4c1d95 0%, transparent 55%),
@@ -148,8 +189,15 @@
   }
 
   @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    25% { transform: translateX(-6px); }
-    75% { transform: translateX(6px); }
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-6px);
+    }
+    75% {
+      transform: translateX(6px);
+    }
   }
 </style>
