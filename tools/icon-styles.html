@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LiquidVoice — icon styles</title>
+  <style>
+    :root {
+      --bg: #07080c;
+      --panel: rgba(18, 16, 28, 0.72);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.42);
+      --line: rgba(255, 255, 255, 0.1);
+      --red: #ef4444;
+      --font: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(ellipse 70% 50% at 18% 12%, rgba(56, 80, 140, 0.18), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 88% 80%, rgba(120, 40, 80, 0.12), transparent 50%),
+        var(--bg);
+      padding: 28px 20px 48px;
+    }
+    main { max-width: 980px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 1.35rem; font-weight: 650; letter-spacing: -0.02em; }
+    .sub { margin: 0 0 22px; color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .card {
+      position: relative;
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.08),
+        0 12px 32px rgba(0, 0, 0, 0.35);
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    }
+    .card:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.22); }
+    .card.selected {
+      border-color: rgba(239, 68, 68, 0.55);
+      box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.1),
+        0 0 0 1px rgba(239, 68, 68, 0.35),
+        0 14px 36px rgba(0, 0, 0, 0.4);
+    }
+    .preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 28px 16px 18px;
+      background:
+        linear-gradient(165deg, rgba(255, 255, 255, 0.04), transparent 45%),
+        repeating-conic-gradient(#101218 0% 25%, #0c0e14 0% 50%) 0 0 / 16px 16px;
+    }
+    .stage-dark, .stage-light {
+      width: 88px;
+      height: 88px;
+      border-radius: 18px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .stage-dark { background: #0a0b10; }
+    .stage-light { background: #d8dde8; }
+    .preview svg { width: 64px; height: 64px; display: block; }
+    .meta { padding: 0 14px 14px; }
+    .letter {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 700;
+      background: rgba(255, 255, 255, 0.08);
+      margin-right: 8px;
+    }
+    .card.selected .letter { background: rgba(239, 68, 68, 0.85); color: #fff; }
+    h2 { margin: 0 0 4px; font-size: 0.95rem; font-weight: 650; display: flex; align-items: center; }
+    p { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
+    .bar {
+      position: sticky;
+      bottom: 12px;
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 999px;
+      background: rgba(12, 10, 20, 0.85);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(16px);
+      color: var(--muted);
+      font-size: 0.88rem;
+      text-align: center;
+    }
+    .bar strong { color: var(--text); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>LiquidVoice icon styles</h1>
+    <p class="sub">
+      Five tray / app icon directions in the same dark frost + red status language as the overlay.
+      Click one to select. Tell me the letter (A–E) and I’ll export PNGs / ICO for the build.
+    </p>
+
+    <div class="grid" id="grid">
+
+      <!-- A: Frost pill + red pulse -->
+      <article class="card" data-choice="A" onclick="pick(this)">
+        <div class="preview">
+          <div class="stage-dark">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="a-body" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#3a3f55" stop-opacity="0.95"/>
+                  <stop offset="0.45" stop-color="#1a1c28" stop-opacity="0.98"/>
+                  <stop offset="1" stop-color="#0e1018"/>
+                </linearGradient>
+                <linearGradient id="a-shine" x1="18" y1="14" x2="46" y2="30" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#fff" stop-opacity="0.35"/>
+                  <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+                </linearGradient>
+                <filter id="a-soft" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="0.6"/>
+                </filter>
+              </defs>
+              <rect x="6" y="6" width="52" height="52" rx="14" fill="#0a0b10"/>
+              <rect x="11" y="24" width="42" height="16" rx="8" fill="url(#a-body)" stroke="rgba(255,255,255,0.12)"/>
+              <rect x="13" y="25.5" width="38" height="6" rx="3" fill="url(#a-shine)" opacity="0.7"/>
+              <circle cx="46" cy="32" r="2.4" fill="#ef4444"/>
+              <circle cx="46" cy="32" r="4.2" fill="#ef4444" opacity="0.28" filter="url(#a-soft)"/>
+            </svg>
+          </div>
+          <div class="stage-light">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="a2-body" x1="12" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#4a5068"/>
+                  <stop offset="1" stop-color="#1c1f2c"/>
+                </linearGradient>
+              </defs>
+              <rect x="6" y="6" width="52" height="52" rx="14" fill="#c5cad6"/>
+              <rect x="11" y="24" width="42" height="16" rx="8" fill="url(#a2-body)"/>
+              <circle cx="46" cy="32" r="2.4" fill="#ef4444"/>
+            </svg>
+          </div>
+        </div>
+        <div class="meta">
+          <h2><span class="letter">A</span> Frost pill</h2>
+          <p>Closest to the listening overlay: rounded glass capsule with a red live dot.</p>
+        </div>
+      </article>
+
+      <!-- B: Mic well in glass tile -->
+      <article class="card" data-choice="B" onclick="pick(this)">
+        <div class="preview">
+          <div class="stage-dark">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="b-tile" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#2c3044" stop-opacity="0.95"/>
+                  <stop offset="1" stop-color="#12141e"/>
+                </linearGradient>
+              </defs>
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#b-tile)" stroke="rgba(255,255,255,0.14)"/>
+              <ellipse cx="32" cy="18" rx="16" ry="7" fill="#fff" opacity="0.1"/>
+              <circle cx="32" cy="32" r="11" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.08)"/>
+              <rect x="29" y="24" width="6" height="11" rx="3" fill="#fff"/>
+              <path d="M24.5 33.5a7.5 7.5 0 0 0 15 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="32" y1="41" x2="32" y2="44.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="44" cy="20" r="3" fill="#ef4444"/>
+            </svg>
+          </div>
+          <div class="stage-light">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="#1a1d2a"/>
+              <circle cx="32" cy="32" r="11" fill="rgba(0,0,0,0.35)"/>
+              <rect x="29" y="24" width="6" height="11" rx="3" fill="#fff"/>
+              <path d="M24.5 33.5a7.5 7.5 0 0 0 15 0" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="32" y1="41" x2="32" y2="44.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="44" cy="20" r="3" fill="#ef4444"/>
+            </svg>
+          </div>
+        </div>
+        <div class="meta">
+          <h2><span class="letter">B</span> Mic well</h2>
+          <p>Glass tile with the same recessed mic mark used in the pill chrome.</p>
+        </div>
+      </article>
+
+      <!-- C: Wave bars + glass -->
+      <article class="card" data-choice="C" onclick="pick(this)">
+        <div class="preview">
+          <div class="stage-dark">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="c-tile" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#32364c"/>
+                  <stop offset="1" stop-color="#10121a"/>
+                </linearGradient>
+              </defs>
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#c-tile)" stroke="rgba(255,255,255,0.12)"/>
+              <g fill="#fff" opacity="0.92">
+                <rect x="18" y="30" width="3.2" height="8" rx="1.6"/>
+                <rect x="23.5" y="24" width="3.2" height="20" rx="1.6"/>
+                <rect x="29" y="20" width="3.2" height="28" rx="1.6"/>
+                <rect x="34.5" y="25" width="3.2" height="18" rx="1.6"/>
+                <rect x="40" y="28" width="3.2" height="12" rx="1.6"/>
+              </g>
+              <circle cx="46" cy="18" r="2.8" fill="#ef4444"/>
+            </svg>
+          </div>
+          <div class="stage-light">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="#181b28"/>
+              <g fill="#fff">
+                <rect x="18" y="30" width="3.2" height="8" rx="1.6"/>
+                <rect x="23.5" y="24" width="3.2" height="20" rx="1.6"/>
+                <rect x="29" y="20" width="3.2" height="28" rx="1.6"/>
+                <rect x="34.5" y="25" width="3.2" height="18" rx="1.6"/>
+                <rect x="40" y="28" width="3.2" height="12" rx="1.6"/>
+              </g>
+              <circle cx="46" cy="18" r="2.8" fill="#ef4444"/>
+            </svg>
+          </div>
+        </div>
+        <div class="meta">
+          <h2><span class="letter">C</span> Waveform</h2>
+          <p>Tapered bars like the live meter — reads as “listening” at a glance.</p>
+        </div>
+      </article>
+
+      <!-- D: Liquid drop / morph orb -->
+      <article class="card" data-choice="D" onclick="pick(this)">
+        <div class="preview">
+          <div class="stage-dark">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="d-orb" cx="38%" cy="32%" r="70%">
+                  <stop stop-color="#5a6178"/>
+                  <stop offset="0.55" stop-color="#1c2030"/>
+                  <stop offset="1" stop-color="#0a0c12"/>
+                </radialGradient>
+              </defs>
+              <rect x="6" y="6" width="52" height="52" rx="14" fill="#090a0f"/>
+              <path d="M32 14c8.5 0 16 8.2 16 18.2S40.5 50 32 50s-16-7.8-16-17.8S23.5 14 32 14z" fill="url(#d-orb)" stroke="rgba(255,255,255,0.14)"/>
+              <ellipse cx="26" cy="26" rx="7" ry="4" fill="#fff" opacity="0.16" transform="rotate(-28 26 26)"/>
+              <circle cx="40" cy="22" r="3" fill="#ef4444"/>
+            </svg>
+          </div>
+          <div class="stage-light">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="d2-orb" cx="38%" cy="32%" r="70%">
+                  <stop stop-color="#6a7188"/>
+                  <stop offset="1" stop-color="#141824"/>
+                </radialGradient>
+              </defs>
+              <rect x="6" y="6" width="52" height="52" rx="14" fill="#c8ceda"/>
+              <path d="M32 14c8.5 0 16 8.2 16 18.2S40.5 50 32 50s-16-7.8-16-17.8S23.5 14 32 14z" fill="url(#d2-orb)"/>
+              <circle cx="40" cy="22" r="3" fill="#ef4444"/>
+            </svg>
+          </div>
+        </div>
+        <div class="meta">
+          <h2><span class="letter">D</span> Liquid orb</h2>
+          <p>Soft morphing droplet — nods to the pill → orb exit motion.</p>
+        </div>
+      </article>
+
+      <!-- E: Minimal L mark + frost -->
+      <article class="card" data-choice="E" onclick="pick(this)">
+        <div class="preview">
+          <div class="stage-dark">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="e-tile" x1="10" y1="8" x2="54" y2="56" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#3a3e52"/>
+                  <stop offset="1" stop-color="#12141c"/>
+                </linearGradient>
+              </defs>
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="url(#e-tile)" stroke="rgba(255,255,255,0.14)"/>
+              <path d="M24 20v22h16" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="44" cy="20" r="3.2" fill="#ef4444"/>
+            </svg>
+          </div>
+          <div class="stage-light">
+            <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="8" y="8" width="48" height="48" rx="14" fill="#1a1d28"/>
+              <path d="M24 20v22h16" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="44" cy="20" r="3.2" fill="#ef4444"/>
+            </svg>
+          </div>
+        </div>
+        <div class="meta">
+          <h2><span class="letter">E</span> Letter L</h2>
+          <p>Simple monogram on frost glass — clearest at tiny tray sizes.</p>
+        </div>
+      </article>
+
+    </div>
+
+    <div class="bar" id="bar">Click a style. Selected: <strong>none</strong></div>
+  </main>
+  <script>
+    function pick(el) {
+      document.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('bar').innerHTML =
+        'Selected: <strong>' + el.dataset.choice + ' — ' + el.querySelector('h2').textContent.replace(/^[A-E]\s*/, '') + '</strong>. Reply with that letter.';
+    }
+  </script>
+</body>
+</html>

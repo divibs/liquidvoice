@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LiquidVoice — frost pill marks</title>
+  <style>
+    :root {
+      --ink: #101218;
+      --mute: #6a6e78;
+      --line: #e2e4ea;
+      --paper: #eef0f4;
+      --red: #ef4444;
+      --disc: #c5cad6;
+      --font: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--ink);
+      background: var(--paper);
+      padding: 36px 20px 72px;
+    }
+    main { max-width: 980px; margin: 0 auto; }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 1.45rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+    }
+    .sub {
+      margin: 0 0 28px;
+      max-width: 40rem;
+      color: var(--mute);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .card:hover { border-color: #b8bcc8; }
+    .card.selected {
+      border-color: var(--ink);
+      box-shadow: 0 0 0 1px var(--ink);
+    }
+    .preview {
+      display: grid;
+      place-items: center;
+      min-height: 200px;
+      padding: 28px;
+      /* checkerboard = transparent outside the disc */
+      background:
+        linear-gradient(45deg, #ddd 25%, transparent 25%),
+        linear-gradient(-45deg, #ddd 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #ddd 75%),
+        linear-gradient(-45deg, transparent 75%, #ddd 75%);
+      background-size: 16px 16px;
+      background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+      background-color: #f7f7f7;
+    }
+    .preview svg { width: 128px; height: 128px; display: block; }
+    .meta { padding: 14px 16px 16px; border-top: 1px solid var(--line); }
+    .row {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+    .letter {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--mute);
+    }
+    .card.selected .letter { color: var(--red); }
+    h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 650;
+      letter-spacing: -0.02em;
+    }
+    p {
+      margin: 0;
+      color: var(--mute);
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    button {
+      font: inherit;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: #f6f7fa;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    button:hover { background: #eceef3; }
+    button.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+    }
+    button.primary:hover { background: #222; }
+    .bar {
+      position: sticky;
+      bottom: 14px;
+      margin-top: 24px;
+      padding: 12px 16px;
+      background: var(--ink);
+      color: rgba(255,255,255,0.55);
+      font-size: 0.88rem;
+      border-radius: 8px;
+      text-align: center;
+    }
+    .bar strong { color: #fff; }
+    .note {
+      margin-top: 18px;
+      font-size: 0.82rem;
+      color: var(--mute);
+      line-height: 1.45;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Frost pill — light disc</h1>
+    <p class="sub">
+      Original style A, light version: gray round disc only (outside is transparent).
+      Three variations below. Checkerboard = empty pixels. Click one, then download SVG / PNG.
+    </p>
+
+    <div class="grid">
+
+      <!-- A0: Classic + waveform + pill shadow (chosen) -->
+      <article class="card selected" data-choice="A0" data-name="Classic" onclick="pick(this)">
+        <div class="preview">
+          <svg id="svg-A0" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g0" x1="28" y1="48" x2="100" y2="80" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#4a5068"/>
+                <stop offset="1" stop-color="#1c1f2c"/>
+              </linearGradient>
+              <filter id="pillShadow0" x="-30%" y="-40%" width="160%" height="180%">
+                <feDropShadow dx="0" dy="1.5" stdDeviation="2.2" flood-color="#000" flood-opacity="0.35"/>
+                <feDropShadow dx="0" dy="0.5" stdDeviation="0.6" flood-color="#000" flood-opacity="0.22"/>
+              </filter>
+            </defs>
+            <circle cx="64" cy="64" r="52" fill="#c5cad6"/>
+            <!-- pill body with soft outline shadow -->
+            <rect x="28" y="52" width="72" height="24" rx="12" fill="url(#g0)" filter="url(#pillShadow0)"/>
+            <rect x="28" y="52" width="72" height="24" rx="12" fill="none" stroke="rgba(0,0,0,0.22)" stroke-width="1"/>
+            <rect x="28.75" y="52.75" width="70.5" height="22.5" rx="11.25" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="0.75"/>
+            <!-- waveform bars (left of live dot) — shorter height, same width -->
+            <g fill="#fff" opacity="0.9">
+              <rect x="38" y="61.5" width="2.6" height="5" rx="1.3"/>
+              <rect x="43.2" y="59.5" width="2.6" height="9" rx="1.3"/>
+              <rect x="48.4" y="58" width="2.6" height="12" rx="1.3"/>
+              <rect x="53.6" y="59.5" width="2.6" height="9" rx="1.3"/>
+              <rect x="58.8" y="60.5" width="2.6" height="7" rx="1.3"/>
+              <rect x="64" y="58.5" width="2.6" height="11" rx="1.3"/>
+              <rect x="69.2" y="60" width="2.6" height="8" rx="1.3"/>
+            </g>
+            <circle cx="90" cy="64" r="4" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="meta">
+          <div class="row"><span class="letter">A0</span><h2>Classic</h2></div>
+          <p>Gray disc, frost pill with soft outline shadow, waveform bars, red live dot.</p>
+          <div class="actions">
+            <button type="button" class="primary" onclick="event.stopPropagation(); dlSvg('A0')">SVG</button>
+            <button type="button" onclick="event.stopPropagation(); dlPng('A0', 512)">PNG 512</button>
+          </div>
+        </div>
+      </article>
+
+      <!-- A1: Brighter glass + sheen -->
+      <article class="card" data-choice="A1" data-name="Sheen" onclick="pick(this)">
+        <div class="preview">
+          <svg id="svg-A1" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g1" x1="28" y1="48" x2="100" y2="84" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#6a718c"/>
+                <stop offset="0.5" stop-color="#2a2e40"/>
+                <stop offset="1" stop-color="#141722"/>
+              </linearGradient>
+              <linearGradient id="s1" x1="34" y1="54" x2="90" y2="66" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#fff" stop-opacity="0.42"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+              <filter id="blur1" x="-40%" y="-40%" width="180%" height="180%">
+                <feGaussianBlur stdDeviation="1.2"/>
+              </filter>
+            </defs>
+            <circle cx="64" cy="64" r="52" fill="#c5cad6"/>
+            <rect x="26" y="50" width="76" height="28" rx="14" fill="url(#g1)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+            <rect x="30" y="53" width="68" height="10" rx="5" fill="url(#s1)"/>
+            <circle cx="88" cy="64" r="6.5" fill="#ef4444" opacity="0.28" filter="url(#blur1)"/>
+            <circle cx="88" cy="64" r="4" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="meta">
+          <div class="row"><span class="letter">A1</span><h2>Sheen</h2></div>
+          <p>Glassier capsule with top highlight and soft red pulse — closer to the overlay.</p>
+          <div class="actions">
+            <button type="button" class="primary" onclick="event.stopPropagation(); dlSvg('A1')">SVG</button>
+            <button type="button" onclick="event.stopPropagation(); dlPng('A1', 512)">PNG 512</button>
+          </div>
+        </div>
+      </article>
+
+      <!-- A2: Slim listening bar -->
+      <article class="card" data-choice="A2" data-name="Slim" onclick="pick(this)">
+        <div class="preview">
+          <svg id="svg-A2" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g2" x1="22" y1="56" x2="106" y2="72" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#555c74"/>
+                <stop offset="1" stop-color="#181b26"/>
+              </linearGradient>
+              <linearGradient id="s2" x1="26" y1="58" x2="80" y2="68" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#fff" stop-opacity="0.32"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <circle cx="64" cy="64" r="52" fill="#c5cad6"/>
+            <rect x="22" y="56" width="84" height="16" rx="8" fill="url(#g2)"/>
+            <rect x="24" y="57.5" width="70" height="5" rx="2.5" fill="url(#s2)"/>
+            <circle cx="94" cy="64" r="3.2" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="meta">
+          <div class="row"><span class="letter">A2</span><h2>Slim</h2></div>
+          <p>Thinner bar — reads as the listening pill at tray size without filling the disc.</p>
+          <div class="actions">
+            <button type="button" class="primary" onclick="event.stopPropagation(); dlSvg('A2')">SVG</button>
+            <button type="button" onclick="event.stopPropagation(); dlPng('A2', 512)">PNG 512</button>
+          </div>
+        </div>
+      </article>
+
+      <!-- A3: Soft white frost -->
+      <article class="card" data-choice="A3" data-name="Pale frost" onclick="pick(this)">
+        <div class="preview">
+          <svg id="svg-A3" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="g3" x1="28" y1="48" x2="100" y2="80" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#f4f6fb"/>
+                <stop offset="0.55" stop-color="#d5dae6"/>
+                <stop offset="1" stop-color="#aeb6c8"/>
+              </linearGradient>
+              <linearGradient id="s3" x1="32" y1="52" x2="88" y2="64" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#fff" stop-opacity="0.85"/>
+                <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+              </linearGradient>
+            </defs>
+            <circle cx="64" cy="64" r="52" fill="#9aa1b0"/>
+            <rect x="28" y="52" width="72" height="24" rx="12" fill="url(#g3)" stroke="rgba(255,255,255,0.55)" stroke-width="1"/>
+            <rect x="32" y="54" width="56" height="8" rx="4" fill="url(#s3)"/>
+            <circle cx="86" cy="64" r="4" fill="#ef4444"/>
+          </svg>
+        </div>
+        <div class="meta">
+          <div class="row"><span class="letter">A3</span><h2>Pale frost</h2></div>
+          <p>True white / silver glass pill on a slightly darker gray disc — the “white” read.</p>
+          <div class="actions">
+            <button type="button" class="primary" onclick="event.stopPropagation(); dlSvg('A3')">SVG</button>
+            <button type="button" onclick="event.stopPropagation(); dlPng('A3', 512)">PNG 512</button>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <p class="note">
+      Outside the gray circle is fully transparent in SVG and PNG exports (no square plate).
+      Reply with <strong>A0</strong>, <strong>A1</strong>, <strong>A2</strong>, or <strong>A3</strong> and I’ll wire it into the Tauri icons.
+    </p>
+    <div class="bar" id="bar">Selected: <strong>A0 — Classic</strong> (waveform + pill shadow). Reply if this looks right and I’ll export icons.</div>
+  </main>
+
+  <script>
+    function pick(el) {
+      document.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('bar').innerHTML =
+        'Selected: <strong>' + el.dataset.choice + ' — ' + el.dataset.name + '</strong>. Reply with that code.';
+    }
+
+    function svgMarkup(id) {
+      const el = document.getElementById('svg-' + id);
+      const clone = el.cloneNode(true);
+      clone.removeAttribute('id');
+      // ensure xmlns for standalone file
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      return '<?xml version="1.0" encoding="UTF-8"?>\n' + clone.outerHTML;
+    }
+
+    function dlSvg(id) {
+      const blob = new Blob([svgMarkup(id)], { type: 'image/svg+xml' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'liquidvoice-frostpill-' + id + '.svg';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    function dlPng(id, size) {
+      const svg = svgMarkup(id);
+      const img = new Image();
+      const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+        URL.revokeObjectURL(url);
+        canvas.toBlob((blob) => {
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'liquidvoice-frostpill-' + id + '-' + size + '.png';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }, 'image/png');
+      };
+      img.src = url;
+    }
+  </script>
+</body>
+</html>
