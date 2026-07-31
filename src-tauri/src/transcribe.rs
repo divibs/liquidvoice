@@ -7,12 +7,30 @@ use crate::config::is_qwen_model;
 
 fn client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
-    CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
-            .expect("reqwest client")
-    })
+    CLIENT.get_or_init(|| reqwest::Client::builder().build().expect("reqwest client"))
+}
+
+/// Long takes need longer than a fixed 30 s (upload + queue + decode).
+fn timeout_for(duration_sec: u32) -> std::time::Duration {
+    std::time::Duration::from_secs((30 + duration_sec).min(120) as u64)
+}
+
+/// Retry once on transport-layer failures (timeout, connect, request error).
+/// HTTP status errors are not retried. Falls back to the original error when
+/// the body is not cloneable (e.g. streaming multipart).
+async fn send_with_retry(req: reqwest::RequestBuilder) -> Result<reqwest::Response, reqwest::Error> {
+    let retry = req.try_clone();
+    match req.send().await {
+        Ok(resp) => Ok(resp),
+        Err(e) if e.is_timeout() || e.is_connect() || e.is_request() => match retry {
+            Some(retry) => {
+                tokio::time::sleep(std::time::Duration::from_millis(600)).await;
+                retry.send().await
+            }
+            None => Err(e),
+        },
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn transcribe(
@@ -21,11 +39,12 @@ pub async fn transcribe(
     wav_data: Vec<u8>,
     language: &str,
     prompt: &str,
+    duration_sec: u32,
 ) -> Result<String, String> {
     if is_qwen_model(model) {
-        transcribe_qwen(api_key, model, wav_data, language, prompt).await
+        transcribe_qwen(api_key, model, wav_data, language, prompt, duration_sec).await
     } else {
-        transcribe_openai(api_key, model, wav_data, language, prompt).await
+        transcribe_openai(api_key, model, wav_data, language, prompt, duration_sec).await
     }
 }
 
@@ -35,6 +54,7 @@ async fn transcribe_openai(
     wav_data: Vec<u8>,
     language: &str,
     prompt: &str,
+    duration_sec: u32,
 ) -> Result<String, String> {
     let mut form = multipart::Form::new()
         .part(
@@ -54,13 +74,15 @@ async fn transcribe_openai(
         form = form.text("prompt", prompt.to_string());
     }
 
-    let resp = client()
-        .post("https://api.openai.com/v1/audio/transcriptions")
-        .bearer_auth(api_key)
-        .multipart(form)
-        .send()
-        .await
-        .map_err(map_network_err("OpenAI"))?;
+    let resp = send_with_retry(
+        client()
+            .post("https://api.openai.com/v1/audio/transcriptions")
+            .bearer_auth(api_key)
+            .multipart(form)
+            .timeout(timeout_for(duration_sec)),
+    )
+    .await
+    .map_err(map_network_err("OpenAI"))?;
 
     if !resp.status().is_success() {
         return Err(map_http_err("OpenAI", resp).await);
@@ -76,6 +98,7 @@ async fn transcribe_qwen(
     wav_data: Vec<u8>,
     language: &str,
     prompt: &str,
+    duration_sec: u32,
 ) -> Result<String, String> {
     // Match the HTML tester success case: intl + input_audio + 16 kHz WAV data URL.
     let data_url = format!("data:audio/wav;base64,{}", B64.encode(&wav_data));
@@ -117,15 +140,17 @@ async fn transcribe_qwen(
         "parameters": parameters
     });
 
-    let resp = client()
-        .post("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation")
-        .bearer_auth(api_key)
-        .header("Content-Type", "application/json")
-        .header("X-DashScope-SSE", "disable")
-        .json(&body)
-        .send()
-        .await
-        .map_err(map_network_err("Qwen"))?;
+    let resp = send_with_retry(
+        client()
+            .post("https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation")
+            .bearer_auth(api_key)
+            .header("Content-Type", "application/json")
+            .header("X-DashScope-SSE", "disable")
+            .json(&body)
+            .timeout(timeout_for(duration_sec)),
+    )
+    .await
+    .map_err(map_network_err("Qwen"))?;
 
     let status = resp.status();
     let body_text = resp.text().await.map_err(|e| format!("Qwen read: {e}"))?;

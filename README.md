@@ -50,6 +50,10 @@ Default hotkey: **Ctrl+Space**.
 
 - Audio is sent to the selected transcription provider only.
 - Text is inserted into the focused application.
+- API keys are stored in `%APPDATA%\liquidvoice\config.json`, encrypted with
+  Windows DPAPI (user-scoped). Legacy plaintext keys are migrated automatically
+  on the next save. Non-Windows dev builds store keys as plain text.
+- No audio is saved to disk; recordings live in memory only.
 
 ---
 

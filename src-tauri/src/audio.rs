@@ -27,7 +27,11 @@ impl AudioRecorder {
         }
     }
 
-    pub fn start(&mut self, on_level: impl Fn(f32) + Send + 'static) -> Result<(), String> {
+    pub fn start(
+        &mut self,
+        on_level: impl Fn(f32) + Send + 'static,
+        on_error: impl Fn(String) + Send + 'static,
+    ) -> Result<(), String> {
         // Drop any previous stream before opening a new one.
         self.stream.0 = None;
 
@@ -59,7 +63,7 @@ impl AudioRecorder {
         let buffer = self.buffer.clone();
         let noise_floor = self.noise_floor.clone();
 
-        let err_fn = |err| eprintln!("Audio stream error: {err}");
+        let err_fn = move |e: cpal::StreamError| on_error(e.to_string());
 
         let stream = match sample_format {
             SampleFormat::I16 => device
@@ -259,7 +263,8 @@ pub fn has_audible_speech(pcm: &[i16], sample_rate: u32) -> bool {
 }
 
 /// Filter Whisper-style silence hallucinations when the model invents filler.
-/// Keep this conservative: never drop short real words like "ok", "you", "bye".
+/// Only unmistakable outro/subtitle artifacts are dropped: bare "thank you"
+/// can be real dictation and must survive.
 pub fn is_likely_hallucination(text: &str) -> bool {
     let t = text.trim().to_lowercase();
     if t.is_empty() {
@@ -284,7 +289,6 @@ pub fn is_likely_hallucination(text: &str) -> bool {
     }
 
     const PHRASES: &[&str] = &[
-        "thank you",
         "thanks for watching",
         "thanks for listening",
         "thank you for watching",
@@ -296,7 +300,9 @@ pub fn is_likely_hallucination(text: &str) -> bool {
         "mbc 뉴스",
         "시청해 주셔서 감사합니다",
     ];
-    PHRASES.iter().any(|p| stripped == *p)
+    // Compare against both the stripped text ("thanks for watching") and the
+    // raw transcript ("www.youtube.com" — dots are stripped above).
+    PHRASES.iter().any(|p| stripped == *p || t == *p)
 }
 
 #[cfg(test)]
@@ -345,10 +351,14 @@ mod tests {
         assert!(!is_likely_hallucination("you"));
         assert!(!is_likely_hallucination("bye"));
         assert!(!is_likely_hallucination("hello world"));
-        assert!(is_likely_hallucination("thank you"));
+        // Bare "thank you" is legitimate dictation, not an artifact.
+        assert!(!is_likely_hallucination("thank you"));
         assert!(is_likely_hallucination("Thanks for watching!"));
         assert!(is_likely_hallucination("..."));
         assert!(is_likely_hallucination(""));
+        assert!(is_likely_hallucination("字幕"));
+        assert!(is_likely_hallucination("amara.org"));
+        assert!(is_likely_hallucination("www.youtube.com"));
     }
 
     #[test]

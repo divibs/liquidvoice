@@ -1,8 +1,40 @@
+/// Foreground window at the moment a take starts; used to refuse injection if
+/// the user switches apps while transcription is in flight.
 #[cfg(windows)]
-pub fn type_text(text: &str) -> Result<(), String> {
+pub fn foreground_window() -> Option<isize> {
+    use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    let hwnd = unsafe { GetForegroundWindow() };
+    (!hwnd.0.is_null()).then_some(hwnd.0 as isize)
+}
+
+#[cfg(not(windows))]
+pub fn foreground_window() -> Option<isize> {
+    None
+}
+
+#[cfg(windows)]
+fn foreground_is(hwnd: isize) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+    unsafe { GetForegroundWindow().0 as isize == hwnd }
+}
+
+#[cfg(not(windows))]
+#[allow(dead_code)]
+fn foreground_is(_hwnd: isize) -> bool {
+    true
+}
+
+#[cfg(windows)]
+pub fn type_text(text: &str, target: Option<isize>) -> Result<(), String> {
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
     };
+
+    if let Some(hwnd) = target {
+        if !foreground_is(hwnd) {
+            return Err("Focus changed during transcription — text not typed".into());
+        }
+    }
 
     // Keep bursts small so target apps (especially slow ones) keep up.
     const CHUNK_SIZE: usize = 64;
@@ -42,7 +74,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
 }
 
 #[cfg(not(windows))]
-pub fn type_text(text: &str) -> Result<(), String> {
+pub fn type_text(text: &str, _target: Option<isize>) -> Result<(), String> {
     eprintln!("[dev] Would type: {text}");
     Ok(())
 }
