@@ -1,6 +1,5 @@
 #[cfg(windows)]
 pub fn type_text(text: &str) -> Result<(), String> {
-    use windows::Win32::Foundation::WPARAM;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, KEYEVENTF_UNICODE,
     };
@@ -21,7 +20,7 @@ pub fn type_text(text: &str) -> Result<(), String> {
                         wScan: code,
                         dwFlags: flags,
                         time: 0,
-                        dwExtraInfo: WPARAM(0),
+                        dwExtraInfo: 0,
                     },
                 },
             };

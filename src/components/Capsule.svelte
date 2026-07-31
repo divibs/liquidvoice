@@ -145,8 +145,11 @@
 
   function barH(i: number) {
     const taper = Math.sin((Math.PI * i) / (N - 1));
-    const amp = 0.5 + 0.5 * Math.sin(wt + i * 0.55);
-    return Math.max(2, (2.2 + taper * (2.8 + lvl * 11) * amp) * uiOp);
+    const wave = 0.5 + 0.5 * Math.sin(wt + i * 0.55);
+    // Dead-zone so ambient hiss stays flat; only real speech drives motion.
+    const energy = Math.max(0, (lvl - 0.04) / 0.96);
+    const motion = taper * energy * 14 * wave;
+    return Math.max(2, (2.2 + motion) * uiOp);
   }
 </script>
 
