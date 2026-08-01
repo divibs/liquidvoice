@@ -1,6 +1,6 @@
 # LiquidVoice
 
-Minimal Windows SST. Hold a hotkey, speak, and the text is typed at the cursor.
+Minimal Windows STT. Hold a hotkey, speak, and the text is typed at the cursor.
 
 Runs in the system tray. Works in any app with a text field.
 
